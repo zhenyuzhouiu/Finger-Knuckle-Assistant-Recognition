@@ -16,6 +16,7 @@ import torch
 
 from os.path import join, exists
 from PIL import Image
+from torchvision.ops import roi_pool, roi_align
 
 
 def load_image(path, options='RGB', size=(128, 128)):
@@ -24,6 +25,41 @@ def load_image(path, options='RGB', size=(128, 128)):
     # if the numpy.ndarray has dtype = np.uint8
     image = np.array(Image.open(path).convert(options).resize(size=size), dtype=np.uint8)
     return image
+
+
+def load_feature(path):
+    """
+    1). load finger knuckle feature maps from yolov5
+    2). for keeping the same feature map size, we use the roi_align
+    """
+    # feature_8.shape:-> h*w*320
+    feature_8 = np.load(path)
+    h = feature_8.shape[0]
+    w = feature_8.shape[1]
+    # h*w*320 -> 320*h*w -> 1*320*h*w
+    feature_8 = torch.from_numpy(np.expand_dims(np.transpose(feature_8, axes=(2, 0, 1)), axis=0)).float()
+    boxes = torch.tensor([[0, 0, 0, w-1, h-1]]).float()
+    pooled_8 = roi_align(feature_8, boxes, [16, 16])
+
+    # feature_16.shape:-> h*w*640
+    feature_16 = np.load(path)
+    h = feature_16.shape[0]
+    w = feature_16.shape[1]
+    # h*w*640 -> 640*h*w -> 1*640*h*w
+    feature_16 = torch.from_numpy(np.expand_dims(np.transpose(feature_16, axes=(2, 0, 1)), axis=0)).float()
+    boxes = torch.tensor([[0, 0, 0, w-1, h-1]]).float()
+    pooled_16 = roi_align(feature_16, boxes, [8, 8])
+
+    # feature_32.shape:-> h*w*1280
+    feature_32 = np.load(path)
+    h = feature_32.shape[0]
+    w = feature_32.shape[1]
+    # h*w*1280 -> 1280*h*w -> 1*1280*h*w
+    feature_32 = torch.from_numpy(np.expand_dims(np.transpose(feature_32, axes=(2, 0, 1)), axis=0)).float()
+    boxes = torch.tensor([[0, 0, 0, w-1, h-1]]).float()
+    pooled_32 = roi_align(feature_32, boxes, [4, 4])
+
+    return pooled_8, pooled_16, pooled_32
 
 
 def randpick_list(src, list_except=None):
@@ -37,11 +73,13 @@ def randpick_list(src, list_except=None):
 
 
 class Factory(torch.utils.data.Dataset):
-    def __init__(self, data_path, input_size=(128, 128), transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True):
+    def __init__(self, img_path, feature_path, input_size=(128, 128),
+                 transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True):
         self.ext = valid_ext
         self.transform = transform
         self._has_ext = lambda f: True if [e for e in self.ext if e in f] else False
-        self.folder = data_path
+        self.folder = img_path
+        self.feature_folder = feature_path
         self.input_size = input_size
         self.train = train
 
@@ -122,3 +160,8 @@ class Factory(torch.utils.data.Dataset):
         if self.transform is not None:
             img = self.transform(img)
         return img, labels
+
+
+if __name__ == "__main__":
+    feature_path = r"C:\Users\ZhenyuZHOU\Desktop\YOLOv5-Assistant-Feature\inference\feature\test\knuckle-00135-0-8.npy"
+    pooled_8, pooled_16, pooled_32 = load_feature(feature_path)

@@ -26,6 +26,10 @@ def build_parser():
     # Dataset Options
     parser.add_argument('--train_path', type=str, dest='train_path',
                         default='/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5x-csl/left-middle-resize/')
+    parser.add_argument('--feature_path', type=str, dest='feature_path',
+                        default='')
+    parser.add_argument('--samples_subject', type=int, dest='samples_subject',
+                        default=5)
 
     # Training Strategy
     parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)

@@ -39,18 +39,19 @@ class Model(object):
         self.train_loader, self.dataset_size = self._build_dataset_loader(args)
         self.inference, self.loss = self._build_model(args)
         self.optimizer = torch.optim.SGD(self.inference.parameters(), args.learning_rate)
+        self.samples_subject = args.samples_subject
 
     def _build_dataset_loader(self, args):
         transform = transforms.Compose([
             transforms.ToTensor()
         ])
-        train_dataset = Factory(args.train_path, input_size=args.input_size, transform=transform,
+        train_dataset = Factory(args.train_path, args.feature_path, input_size=args.input_size, transform=transform,
                                 valid_ext=['.bmp', '.jpg', '.JPG'], train=True)
         logging("Successfully Load {} as training dataset...".format(args.train_path))
         train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
 
         examples = iter(train_loader)
-        example_data, example_target = examples.next()
+        example_data, example_target, example_feature = examples.next()
         example_anchor = example_data[:, 0:3, :, :]
         example_positive = example_data[:, 3:6, :, :]
         example_negative = example_data[:, 6:9, :, :]
@@ -152,7 +153,8 @@ class Model(object):
             # for batch_id, (x, _) in enumerate(self.train_loader):
             # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
             loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
-            for batch_id, (x, _) in loop:
+            for batch_id, (x, _, assistant_f) in loop:
+
                 count += len(x)
                 x = x.cuda()
                 x = Variable(x, requires_grad=False)
@@ -161,8 +163,8 @@ class Model(object):
                 fms = fms.view(x.size(0), -1, fms.size(2), fms.size(3))
 
                 anchor_fm = fms[:, 0, :, :].unsqueeze(1)
-                pos_fm = fms[:, 1, :, :].unsqueeze(1)
-                neg_fm = fms[:, 2:, :, :].contiguous()
+                pos_fm = fms[:, 1:self.samples_subject-1, :, :].unsqueeze(1)
+                neg_fm = fms[:, self.samples_subject, :, :].contiguous()
 
                 nneg = neg_fm.size(1)
                 neg_fm = neg_fm.view(-1, 1, neg_fm.size(2), neg_fm.size(3))

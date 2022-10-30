@@ -27,39 +27,40 @@ def load_image(path, options='RGB', size=(128, 128)):
     return image
 
 
-def load_feature(path):
+def load_feature(path, image_name):
     """
     1). load finger knuckle feature maps from yolov5
     2). for keeping the same feature map size, we use the roi_align
     """
+    image_name = image_name.split('.')[0]
     # feature_8.shape:-> h*w*320
-    feature_8 = np.load(path)
+    feature_8 = np.load(join(path, image_name + '-8.npy'))
     h = feature_8.shape[0]
     w = feature_8.shape[1]
     # h*w*320 -> 320*h*w -> 1*320*h*w
     feature_8 = torch.from_numpy(np.expand_dims(np.transpose(feature_8, axes=(2, 0, 1)), axis=0)).float()
-    boxes = torch.tensor([[0, 0, 0, w-1, h-1]]).float()
+    boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
     pooled_8 = roi_align(feature_8, boxes, [16, 16])
 
     # feature_16.shape:-> h*w*640
-    feature_16 = np.load(path)
+    feature_16 = np.load(join(path, image_name + '-16.npy'))
     h = feature_16.shape[0]
     w = feature_16.shape[1]
     # h*w*640 -> 640*h*w -> 1*640*h*w
     feature_16 = torch.from_numpy(np.expand_dims(np.transpose(feature_16, axes=(2, 0, 1)), axis=0)).float()
-    boxes = torch.tensor([[0, 0, 0, w-1, h-1]]).float()
+    boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
     pooled_16 = roi_align(feature_16, boxes, [8, 8])
 
     # feature_32.shape:-> h*w*1280
-    feature_32 = np.load(path)
+    feature_32 = np.load(join(path, image_name + '-32.npy'))
     h = feature_32.shape[0]
     w = feature_32.shape[1]
     # h*w*1280 -> 1280*h*w -> 1*1280*h*w
     feature_32 = torch.from_numpy(np.expand_dims(np.transpose(feature_32, axes=(2, 0, 1)), axis=0)).float()
-    boxes = torch.tensor([[0, 0, 0, w-1, h-1]]).float()
+    boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
     pooled_32 = roi_align(feature_32, boxes, [4, 4])
 
-    return pooled_8, pooled_16, pooled_32
+    return [pooled_8, pooled_16, pooled_32]
 
 
 def randpick_list(src, list_except=None):
@@ -72,14 +73,15 @@ def randpick_list(src, list_except=None):
         return src_cp[np.random.randint(len(src_cp))]
 
 
-def randpick_list(src, list_except=None):
+def reminderpick_list(src, list_except=None):
     if not list_except:
-        return src[np.random.randint(len(src))]
+        return src
     else:
         src_cp = list(src)
         for exc in list_except:
             src_cp.remove(exc)
-        return src_cp[np.random.randint(len(src_cp))]
+        return src_cp
+
 
 class Factory(torch.utils.data.Dataset):
     def __init__(self, img_path, feature_path, input_size=(128, 128),
@@ -133,32 +135,50 @@ class Factory(torch.utils.data.Dataset):
             if self.min_subj > len(inames):
                 self.min_subj = len(inames)
 
+    def _feature_dict_(self):
+        self.feature_fdict = {}
+        self.feature_fnames = []
+        self.min_subj = 1000000
+        for sf in self.subfolder_names:
+            fnames = [d for d in os.listdir(join(self.feature_folder, sf))]
+            if len(fnames) < 1 and self.train:
+                raise RuntimeError('Pls make sure there are at least one feature in {}'.format(
+                    join(self.feature_folder, sf)
+                ))
+            self.feature_fnames = self.feature_fnames + [join(self.feature_folder, sf, f) for f in fnames]
+            self.feature_fdict[sf] = fnames
+            if self.min_subj > len(fnames):
+                self.min_subj = len(fnames)
+
     def _triplet_trainitems(self, index):
+        # ======================= get images and corresponding features and label
         # Per index, per subject
-
         selected_folder = self.subfolder_names[index]
+        list_folders = [selected_folder]
         anchor = randpick_list(self.fdict[selected_folder])
-        src_cp = list(src)
-        for exc in list_except:
-            src_cp.remove(exc)
-        return src_cp[np.random.randint(len(src_cp))]
-        positive = randpick_list(self.fdict[selected_folder], [anchor])
+        positive = reminderpick_list(self.fdict[selected_folder], [anchor])
 
-        img = []
         # options = 'L' just convert image to gray image
+        # img = []
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L'), -1))
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
-        img.append(load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size))
-        img.append(load_image(join(self.folder, selected_folder, positive), options='RGB', size=self.input_size))
+        img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
+        feature = [load_feature(join(self.feature_folder, selected_folder), image_name=anchor)]
+        for p in positive:
+            img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
+            feature.append(load_feature(join(self.feature_folder, selected_folder), image_name=p))
 
-        # Negative samples 5 times than positive
-        for i in range(5):
-            negative_folder = randpick_list(self.subfolder_names, [selected_folder])
-            negative = randpick_list(self.fdict[negative_folder])
-            # img.append(np.expand_dims(load_image(join(self.folder, negative_folder, negative), options='RGB'), -1))
-            img.append(load_image(join(self.folder, negative_folder, negative), options='RGB', size=self.input_size))
-
-        img = np.concatenate(img, axis=-1)
+        # Negative samples 2 times than positive
+        for i in range(2):
+            negative_folder = randpick_list(self.subfolder_names, list_folders)
+            list_folders.append(negative_folder)
+            negative = reminderpick_list(self.fdict[negative_folder])
+            for n in negative:
+                img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
+                feature.append(load_feature(join(self.feature_folder, negative_folder), image_name=n))
+        # img is the data
+        # junk is the label
+        img = np.concatenate(index, axis=-1)
         junk = np.array([0])
         if self.transform is not None:
             # Converts a PIL Image or numpy.ndarray (H x W x C) in the range [0, 255]
@@ -167,9 +187,8 @@ class Factory(torch.utils.data.Dataset):
             # or if the numpy.ndarray has dtype = np.uint8
             # In the other cases, tensors are returned without scaling.
             img = self.transform(img)
-        # img is the data
-        # junk is the label
-        return img, junk
+
+        return img, junk, feature
 
     def _get_testitems(self, index):
         fname = self.inames[index]

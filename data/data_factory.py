@@ -72,6 +72,15 @@ def randpick_list(src, list_except=None):
         return src_cp[np.random.randint(len(src_cp))]
 
 
+def randpick_list(src, list_except=None):
+    if not list_except:
+        return src[np.random.randint(len(src))]
+    else:
+        src_cp = list(src)
+        for exc in list_except:
+            src_cp.remove(exc)
+        return src_cp[np.random.randint(len(src_cp))]
+
 class Factory(torch.utils.data.Dataset):
     def __init__(self, img_path, feature_path, input_size=(128, 128),
                  transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True):
@@ -89,7 +98,8 @@ class Factory(torch.utils.data.Dataset):
         self.subfolder_names = [d for d in os.listdir(self.folder) if '.' not in d]
         if not self.subfolder_names:
             raise RuntimeError('Dataset must have subfolders indicating labels: {}'.format(self.folder))
-
+        # get subject folder dictionary
+        # get each image path
         self._build_fdict()
 
     def __getitem__(self, index):
@@ -105,6 +115,10 @@ class Factory(torch.utils.data.Dataset):
             return len(self.inames)
 
     def _build_fdict(self):
+        '''
+        self.fdict:-> dictionary {subject_folder: image_name}
+        self.inames contains each image absolute path self.folder + sf + f
+        '''
         self.fdict = {}
         self.inames = []
         self.min_subj = 1000000
@@ -121,10 +135,13 @@ class Factory(torch.utils.data.Dataset):
 
     def _triplet_trainitems(self, index):
         # Per index, per subject
-        # Negative samples 5 times than positive
 
         selected_folder = self.subfolder_names[index]
         anchor = randpick_list(self.fdict[selected_folder])
+        src_cp = list(src)
+        for exc in list_except:
+            src_cp.remove(exc)
+        return src_cp[np.random.randint(len(src_cp))]
         positive = randpick_list(self.fdict[selected_folder], [anchor])
 
         img = []
@@ -134,6 +151,7 @@ class Factory(torch.utils.data.Dataset):
         img.append(load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size))
         img.append(load_image(join(self.folder, selected_folder, positive), options='RGB', size=self.input_size))
 
+        # Negative samples 5 times than positive
         for i in range(5):
             negative_folder = randpick_list(self.subfolder_names, [selected_folder])
             negative = randpick_list(self.fdict[negative_folder])

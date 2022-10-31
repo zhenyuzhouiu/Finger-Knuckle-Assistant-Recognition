@@ -77,6 +77,11 @@ class ConvBNAct(nn.Module):
 
 
 class SqueezeExcite(nn.Module):
+    """
+    se_ratio: the channels of middle layer of the SE
+    conv_reduce: expand_c  to input_c * se_ratio
+    conv_expand: input_c * se_ratio to expand_c
+    """
     def __init__(self,
                  input_c: int,  # block input channel
                  expand_c: int,  # block expand channel
@@ -316,7 +321,6 @@ class EfficientNetV2(nn.Module):
 class FKEfficientNetV2(nn.Module):
     def __init__(self,
                  model_cnf: list,
-                 dropout_rate: float = 0.2,
                  drop_connect_rate: float = 0.2):
         super(FKEfficientNetV2, self).__init__()
 
@@ -355,14 +359,10 @@ class FKEfficientNetV2(nn.Module):
         head = OrderedDict()
         # head_input_c of efficientnet_s: 512
         head.update({"conv1": ConvBNAct(head_input_c,
-                                        64,
+                                        head_input_c,
                                         kernel_size=3,
+                                        stride=1,
                                         norm_layer=norm_layer)})  # 激活函数默认是SiLU
-
-        head.update({"conv2": ConvBNAct(64,
-                                        1,
-                                        kernel_size=3,
-                                        norm_layer=norm_layer)})
 
         self.head = nn.Sequential(head)
 
@@ -389,21 +389,16 @@ class FKEfficientNetV2(nn.Module):
 
 def fk_efficientnetv2_s():
     """
-    EfficientNetV2
-    https://arxiv.org/abs/2104.00298
+    FK_EfficientNetV2
+    The original EfficientNetV2 is too deep,
     """
-    # train_size: 300, eval_size: 384
-
     # repeat, kernel, stride, expansion, in_c, out_c, operator, se_ratio
-    model_config = [[2, 3, 1, 1, 24, 24, 0, 0],
-                    [4, 3, 2, 4, 24, 48, 0, 0],
-                    [4, 3, 2, 4, 48, 64, 0, 0],
-                    [6, 3, 2, 4, 64, 128, 1, 0.25],
-                    [9, 3, 1, 6, 128, 160, 1, 0.25],
-                    [15, 3, 2, 6, 160, 256, 1, 0.25]]
+    model_config = [[2, 3, 1, 1, 32, 32, 1, 0.25],
+                    [4, 3, 2, 4, 32, 64, 1, 0.25],
+                    [6, 3, 2, 4, 64, 128, 1, 0.25]]
 
     model = FKEfficientNetV2(model_cnf=model_config,
-                             dropout_rate=0.3)
+                             drop_connect_rate=0.2)
 
     return model
 
@@ -416,6 +411,8 @@ def efficientnetv2_s(num_classes: int = 1000):
     # train_size: 300, eval_size: 384
 
     # repeat, kernel, stride, expansion, in_c, out_c, operator, se_ratio
+    # operator: 0 for FusedMBConv, 1 for MBConv
+    # se_ratio =
     model_config = [[2, 3, 1, 1, 24, 24, 0, 0],
                     [4, 3, 2, 4, 24, 48, 0, 0],
                     [4, 3, 2, 4, 48, 64, 0, 0],

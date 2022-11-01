@@ -153,8 +153,10 @@ class Model(object):
             # for batch_id, (x, _) in enumerate(self.train_loader):
             # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
             loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
-            for batch_id, (x, _, assistant_f) in loop:
-
+            for batch_id, (x, _, assistant_f8, assistant_f16, assistant_f32) in loop:
+                # x.shape :-> [b, 3*3*samples_subject, h, w]
+                # y.shape:
+                # assistant_f8.shape :-> [b, 320*3*samples_subject, 32, 32]
                 count += len(x)
                 x = x.cuda()
                 x = Variable(x, requires_grad=False)

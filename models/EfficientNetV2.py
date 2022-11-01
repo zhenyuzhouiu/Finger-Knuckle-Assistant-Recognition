@@ -1,10 +1,11 @@
+import torch.nn as nn
+import torch
+
 from collections import OrderedDict
 from functools import partial
 from typing import Callable, Optional
-
-import torch.nn as nn
-import torch
 from torch import Tensor
+from torchvision.ops import roi_pool, roi_align
 
 
 def drop_path(x, drop_prob: float = 0., training: bool = False):
@@ -357,9 +358,15 @@ class FKEfficientNetV2(nn.Module):
 
         head_input_c = model_cnf[-1][-3]
         head = OrderedDict()
-        # head_input_c of efficientnet_s: 512
+        # head_input_c of fk_efficientnetv2_s: 128
         head.update({"conv1": ConvBNAct(head_input_c,
-                                        head_input_c,
+                                        64,
+                                        kernel_size=3,
+                                        stride=1,
+                                        norm_layer=norm_layer)})  # 激活函数默认是SiLU
+
+        head.update({"conv2": ConvBNAct(64,
+                                        1,
                                         kernel_size=3,
                                         stride=1,
                                         norm_layer=norm_layer)})  # 激活函数默认是SiLU
@@ -382,7 +389,15 @@ class FKEfficientNetV2(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         x = self.stem(x)
         x = self.blocks(x)
+
+        # using ROI Align operations to align feature to the same size
+        b, c, h, w = x.size()
+        box = torch.tensor([0, 0, w - 1, h - 1]).float()
+        list_box = [box]*b
+        x = roi_align(x, list_box, [32, 32])
+
         x = self.head(x)
+        # output x.size() [b, 1, 32, 32]
 
         return x
 

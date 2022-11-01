@@ -27,10 +27,12 @@ def load_image(path, options='RGB', size=(128, 128)):
     return image
 
 
-def load_feature(path, image_name):
+def load_feature_8(path, image_name):
     """
     1). load finger knuckle feature maps from yolov5
     2). for keeping the same feature map size, we use the roi_align
+
+    return pooled_8.type:-> tensor; pooled_8.shape:-> [1, 320, 32, 32]
     """
     image_name = image_name.split('.')[0]
     # feature_8.shape:-> h*w*320
@@ -40,8 +42,17 @@ def load_feature(path, image_name):
     # h*w*320 -> 320*h*w -> 1*320*h*w
     feature_8 = torch.from_numpy(np.expand_dims(np.transpose(feature_8, axes=(2, 0, 1)), axis=0)).float()
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-    pooled_8 = roi_align(feature_8, boxes, [16, 16])
+    pooled_8 = roi_align(feature_8, boxes, [32, 32])
 
+
+    return pooled_8
+
+
+def load_feature_16(path, image_name):
+    """
+    1). load finger knuckle feature maps from yolov5
+    2). for keeping the same feature map size, we use the roi_align
+    """
     # feature_16.shape:-> h*w*640
     feature_16 = np.load(join(path, image_name + '-16.npy'))
     h = feature_16.shape[0]
@@ -49,7 +60,16 @@ def load_feature(path, image_name):
     # h*w*640 -> 640*h*w -> 1*640*h*w
     feature_16 = torch.from_numpy(np.expand_dims(np.transpose(feature_16, axes=(2, 0, 1)), axis=0)).float()
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-    pooled_16 = roi_align(feature_16, boxes, [8, 8])
+    pooled_16 = roi_align(feature_16, boxes, [16, 16])
+
+    return pooled_16
+
+
+def load_feature_32(path, image_name):
+    """
+    1). load finger knuckle feature maps from yolov5
+    2). for keeping the same feature map size, we use the roi_align
+    """
 
     # feature_32.shape:-> h*w*1280
     feature_32 = np.load(join(path, image_name + '-32.npy'))
@@ -58,9 +78,9 @@ def load_feature(path, image_name):
     # h*w*1280 -> 1280*h*w -> 1*1280*h*w
     feature_32 = torch.from_numpy(np.expand_dims(np.transpose(feature_32, axes=(2, 0, 1)), axis=0)).float()
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-    pooled_32 = roi_align(feature_32, boxes, [4, 4])
+    pooled_32 = roi_align(feature_32, boxes, [8, 8])
 
-    return [pooled_8, pooled_16, pooled_32]
+    return pooled_32
 
 
 def randpick_list(src, list_except=None):
@@ -163,10 +183,14 @@ class Factory(torch.utils.data.Dataset):
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L'), -1))
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
         img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
-        feature = [load_feature(join(self.feature_folder, selected_folder), image_name=anchor)]
+        stride_8 = load_feature_8(join(self.feature_folder, selected_folder), image_name=anchor)
+        stride_16 = load_feature_16(join(self.feature_folder, selected_folder), image_name=anchor)
+        stride_32 = load_feature_32(join(self.feature_folder, selected_folder), image_name=anchor)
         for p in positive:
             img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
-            feature.append(load_feature(join(self.feature_folder, selected_folder), image_name=p))
+            stride_8 = torch.cat([stride_8, load_feature_8(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
+            stride_16 = torch.cat([stride_16, load_feature_16(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
+            stride_32 = torch.cat([stride_32, load_feature_32(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
 
         # Negative samples 2 times than positive
         for i in range(2):
@@ -175,7 +199,12 @@ class Factory(torch.utils.data.Dataset):
             negative = reminderpick_list(self.fdict[negative_folder])
             for n in negative:
                 img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
-                feature.append(load_feature(join(self.feature_folder, negative_folder), image_name=n))
+                stride_8 = torch.cat(
+                    [stride_8, load_feature_8(join(self.feature_folder, selected_folder), image_name=n)], dim=0)
+                stride_16 = torch.cat(
+                    [stride_16, load_feature_16(join(self.feature_folder, selected_folder), image_name=n)], dim=0)
+                stride_32 = torch.cat(
+                    [stride_32, load_feature_32(join(self.feature_folder, selected_folder), image_name=n)], dim=0)
         # img is the data
         # junk is the label
         img = np.concatenate(index, axis=-1)
@@ -188,7 +217,10 @@ class Factory(torch.utils.data.Dataset):
             # In the other cases, tensors are returned without scaling.
             img = self.transform(img)
 
-        return img, junk, feature
+        # stride_8.shape:-> [320*3*samples_subject, 32, 32]; stride_8.type:-> tensor
+        # stride_16.shape:-> [640*3*samples_subject, 16, 16]
+        # stride_32.shape:-> [1280*3*samples_subject, 8, 8]
+        return img, junk, stride_8, stride_16, stride_32
 
     def _get_testitems(self, index):
         fname = self.inames[index]
@@ -201,4 +233,4 @@ class Factory(torch.utils.data.Dataset):
 
 if __name__ == "__main__":
     feature_path = r"C:\Users\ZhenyuZHOU\Desktop\YOLOv5-Assistant-Feature\inference\feature\test\knuckle-00135-0-8.npy"
-    pooled_8, pooled_16, pooled_32 = load_feature(feature_path)
+    pooled_8 = load_feature_8(feature_path)

@@ -185,3 +185,12 @@ class RFNWithSTNet(torch.nn.Module):
 
         return out
 
+
+class AssistantModel(torch.nn.Module):
+    def __init__(self):
+        super(AssistantModel, self).__init__()
+        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
+        self.conv1 = nn.Conv2d(in_channels=, out_channels=, kernel_size=3, )
+        self.conv2 = nn.Conv2d(in_channels=, out_channels=, kernel_size=3, )
+
+    def forward(self, x8, x16, x32):

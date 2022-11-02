@@ -69,11 +69,12 @@ def load_feature_8(path, image_name):
     norm_pooled_8 = pooled_8
     for i in range(pooled_8.size(0)):
         pooled_i = pooled_8[i, :, :]
-        mean = pooled_i.mean()
+        min = pooled_i.min()
+        max = pooled_i.max()
+        pooled_i = (pooled_i - min)/(max - min)
+        norm_pooled_8[i, :, :] = pooled_i.unsqueeze(0)
 
-
-
-    return pooled_8
+    return norm_pooled_8
 
 
 def load_feature_16(path, image_name):
@@ -91,8 +92,15 @@ def load_feature_16(path, image_name):
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
     pooled_16 = roi_align(feature_16, boxes, [16, 16])
     pooled_16 = pooled_16.squeeze(0)
+    norm_pooled_16 = pooled_16
+    for i in range(pooled_16.size(0)):
+        pooled_i = pooled_16[i, :, :]
+        min = pooled_i.min()
+        max = pooled_i.max()
+        pooled_i = (pooled_i - min) / (max - min)
+        norm_pooled_16[i, :, :] = pooled_i.unsqueeze(0)
 
-    return pooled_16
+    return norm_pooled_16
 
 
 def load_feature_32(path, image_name):
@@ -110,8 +118,15 @@ def load_feature_32(path, image_name):
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
     pooled_32 = roi_align(feature_32, boxes, [8, 8])
     pooled_32 = pooled_32.squeeze(0)
+    norm_pooled_32 = pooled_32
+    for i in range(pooled_32.size(0)):
+        pooled_i = pooled_32[i, :, :]
+        min = pooled_i.min()
+        max = pooled_i.max()
+        pooled_i = (pooled_i - min) / (max - min)
+        norm_pooled_32[i, :, :] = pooled_i.unsqueeze(0)
 
-    return pooled_32
+    return norm_pooled_32
 
 
 def randpick_list(src, list_except=None):

@@ -189,20 +189,29 @@ class RFNWithSTNet(torch.nn.Module):
 class AssistantModel(torch.nn.Module):
     def __init__(self):
         super(AssistantModel, self).__init__()
+        # ======================================== reduce dimension
+        self.reduce1 = nn.Conv2d(in_channels=1280, out_channels=640, kernel_size=1)
+        self.reduce2 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=1)
+        self.reduce3 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=1)
+
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
-        self.conv1 = nn.Conv2d(in_channels=1280, out_channels=640, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(num_features=640)
-        self.conv2 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(num_features=320)
-        self.conv3 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=3)
-        self.bn3 = nn.BatchNorm2d(num_features=128)
-        self.resid1 = ResidualBlock(128)
-        self.resid2 = ResidualBlock(128)
-        self.conv4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3)
-        self.bn4 = nn.BatchNorm2d(num_features=64)
-        self.conv5 = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=3)
+        self.conv1 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(num_features=320)
+        self.conv2 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(num_features=128)
+        self.conv3 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3)
+        self.bn3 = nn.BatchNorm2d(num_features=64)
+        self.resid1 = ResidualBlock(64)
+        self.resid2 = ResidualBlock(64)
+        self.conv4 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3)
+        self.bn4 = nn.BatchNorm2d(num_features=32)
+        self.conv5 = nn.Conv2d(in_channels=32, out_channels=1, kernel_size=3)
 
     def forward(self, x8, x16, x32):
+        x32 = F.sigmoid(self.reduce1(x32))
+        x16 = F.sigmoid(self.reduce2(x16))
+        x8 = F.sigmoid(self.reduce3(x8))
+
         x32 = self.upsample(x32)
         x32 = F.relu(self.bn1(self.conv1(x32)))
         x16 = x16+x32

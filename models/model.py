@@ -39,8 +39,8 @@ class Model(object):
         self.samples_subject = args.samples_subject
         self.train_loader, self.dataset_size = self._build_dataset_loader(args)
         self.inference, self.assistant, self.loss = self._build_model(args)
-        self.optimizer = torch.optim.SGD(self.inference.parameters(), args.learning_rate)
-        self.assistant_optimizer = torch.optim.SGD(self.assistant.parameters(), args.learning_rate)
+        self.optimizer = torch.optim.Adam(self.inference.parameters(), args.learning_rate)
+        self.assistant_optimizer = torch.optim.Adam(self.assistant.parameters(), args.learning_rate*0.1)
 
     def _build_dataset_loader(self, args):
         transform = transforms.Compose([
@@ -205,7 +205,11 @@ class Model(object):
                 an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
                                     neg_fm)
                 an_loss = an_loss.view((-1, nneg)).min(1)[0]
-                ap_loss = self.loss(anchor_fm, pos_fm)
+
+                npos = pos_fm.size(1)
+                pos_fm = pos_fm.view(-1, 1, pos_fm.size(2), pos_fm.size(3))
+                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)), pos_fm)
+                ap_loss = ap_loss.view((-1, npos)).max(1)[0]
 
                 assistant_sstl = ap_loss - an_loss + args.alpha
                 assistant_sstl = torch.clamp(assistant_sstl, min=0)

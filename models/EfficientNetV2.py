@@ -408,7 +408,7 @@ def fk_efficientnetv2_s():
     The original EfficientNetV2 is too deep,
     """
     # repeat, kernel, stride, expansion, in_c, out_c, operator, se_ratio
-    model_config = [[2, 3, 1, 1, 32, 32, 1, 0.25],
+    model_config = [[2, 3, 1, 4, 32, 32, 1, 0.25],
                     [4, 3, 2, 4, 32, 64, 1, 0.25],
                     [6, 3, 2, 4, 64, 128, 1, 0.25]]
 

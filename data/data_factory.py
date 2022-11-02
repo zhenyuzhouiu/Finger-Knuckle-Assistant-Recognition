@@ -19,11 +19,11 @@ from PIL import Image
 from torchvision.ops import roi_pool, roi_align
 
 
-def load_image(path, options='RGB', size=(128, 128)):
+def load_image(path, options='RGB'):
     assert (options in ["RGB", "L"])
     # the torch.ToTensor will scaling the [0, 255] to [0.0, 1.0]
     # if the numpy.ndarray has dtype = np.uint8
-    image = np.array(Image.open(path).convert(options).resize(size=size), dtype=np.uint8)
+    image = np.array(Image.open(path).convert(options), dtype=np.uint8)
     return image
 
 
@@ -43,7 +43,7 @@ def load_feature_8(path, image_name):
     feature_8 = torch.from_numpy(np.expand_dims(np.transpose(feature_8, axes=(2, 0, 1)), axis=0)).float()
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
     pooled_8 = roi_align(feature_8, boxes, [32, 32])
-
+    pooled_8 = pooled_8.squeeze(0)
 
     return pooled_8
 
@@ -53,6 +53,7 @@ def load_feature_16(path, image_name):
     1). load finger knuckle feature maps from yolov5
     2). for keeping the same feature map size, we use the roi_align
     """
+    image_name = image_name.split('.')[0]
     # feature_16.shape:-> h*w*640
     feature_16 = np.load(join(path, image_name + '-16.npy'))
     h = feature_16.shape[0]
@@ -61,6 +62,7 @@ def load_feature_16(path, image_name):
     feature_16 = torch.from_numpy(np.expand_dims(np.transpose(feature_16, axes=(2, 0, 1)), axis=0)).float()
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
     pooled_16 = roi_align(feature_16, boxes, [16, 16])
+    pooled_16 = pooled_16.squeeze(0)
 
     return pooled_16
 
@@ -70,7 +72,7 @@ def load_feature_32(path, image_name):
     1). load finger knuckle feature maps from yolov5
     2). for keeping the same feature map size, we use the roi_align
     """
-
+    image_name = image_name.split('.')[0]
     # feature_32.shape:-> h*w*1280
     feature_32 = np.load(join(path, image_name + '-32.npy'))
     h = feature_32.shape[0]
@@ -79,6 +81,7 @@ def load_feature_32(path, image_name):
     feature_32 = torch.from_numpy(np.expand_dims(np.transpose(feature_32, axes=(2, 0, 1)), axis=0)).float()
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
     pooled_32 = roi_align(feature_32, boxes, [8, 8])
+    pooled_32 = pooled_32.squeeze(0)
 
     return pooled_32
 
@@ -104,14 +107,13 @@ def reminderpick_list(src, list_except=None):
 
 
 class Factory(torch.utils.data.Dataset):
-    def __init__(self, img_path, feature_path, input_size=(128, 128),
+    def __init__(self, img_path, feature_path,
                  transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True):
         self.ext = valid_ext
         self.transform = transform
         self._has_ext = lambda f: True if [e for e in self.ext if e in f] else False
         self.folder = img_path
         self.feature_folder = feature_path
-        self.input_size = input_size
         self.train = train
 
         if not exists(self.folder):
@@ -182,12 +184,12 @@ class Factory(torch.utils.data.Dataset):
         # img = []
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L'), -1))
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
-        img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
+        img = [load_image(join(self.folder, selected_folder, anchor), options='RGB')]
         stride_8 = load_feature_8(join(self.feature_folder, selected_folder), image_name=anchor)
         stride_16 = load_feature_16(join(self.feature_folder, selected_folder), image_name=anchor)
         stride_32 = load_feature_32(join(self.feature_folder, selected_folder), image_name=anchor)
         for p in positive:
-            img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
+            img.append(load_image(join(self.folder, selected_folder, p), options='RGB'))
             stride_8 = torch.cat([stride_8, load_feature_8(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
             stride_16 = torch.cat([stride_16, load_feature_16(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
             stride_32 = torch.cat([stride_32, load_feature_32(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
@@ -198,16 +200,16 @@ class Factory(torch.utils.data.Dataset):
             list_folders.append(negative_folder)
             negative = reminderpick_list(self.fdict[negative_folder])
             for n in negative:
-                img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
+                img.append(load_image(join(self.folder, negative_folder, n), options='RGB'))
                 stride_8 = torch.cat(
-                    [stride_8, load_feature_8(join(self.feature_folder, selected_folder), image_name=n)], dim=0)
+                    [stride_8, load_feature_8(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
                 stride_16 = torch.cat(
-                    [stride_16, load_feature_16(join(self.feature_folder, selected_folder), image_name=n)], dim=0)
+                    [stride_16, load_feature_16(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
                 stride_32 = torch.cat(
-                    [stride_32, load_feature_32(join(self.feature_folder, selected_folder), image_name=n)], dim=0)
+                    [stride_32, load_feature_32(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
         # img is the data
         # junk is the label
-        img = np.concatenate(index, axis=-1)
+        img = np.concatenate(img, axis=-1)
         junk = np.array([0])
         if self.transform is not None:
             # Converts a PIL Image or numpy.ndarray (H x W x C) in the range [0, 255]

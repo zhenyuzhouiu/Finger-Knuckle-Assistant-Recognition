@@ -25,14 +25,14 @@ def build_parser():
 
     # Dataset Options
     parser.add_argument('--train_path', type=str, dest='train_path',
-                        default='/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5x-csl/left-middle-resize/')
+                        default='/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-middle-crop/')
     parser.add_argument('--feature_path', type=str, dest='feature_path',
-                        default='')
+                        default='/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-middle-feature/')
     parser.add_argument('--samples_subject', type=int, dest='samples_subject',
                         default=5)
 
     # Training Strategy
-    parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
+    parser.add_argument('--batch_size', type=int, dest='batch_size', default=8)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
     parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=1e-3)
 
@@ -43,13 +43,13 @@ def build_parser():
     parser.add_argument('--alpha', type=float, dest='alpha', default=20)
     parser.add_argument('--model', type=str, dest='model', default="RFNet")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128))
-    parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=4)
-    parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=4)
+    parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=0)
+    parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=0)
     parser.add_argument('--block_size', type=int, dest="block_size", default=8)
-    parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=4)
+    parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=0)
 
     # fine-tuning
-    parser.add_argument('--start_ckpt', type=str, dest='start_ckpt', default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/checkpoint/RFNet/fkv1_RFNet-wholeimagerotationandtranslation-lr0.0001-subs8-angle5-a10-s4_2022-06-13-17-52/ckpt_epoch_820.pth")
+    parser.add_argument('--start_ckpt', type=str, dest='start_ckpt', default="")
     return parser
 
 

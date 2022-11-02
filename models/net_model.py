@@ -190,8 +190,8 @@ class AssistantModel(torch.nn.Module):
     def __init__(self):
         super(AssistantModel, self).__init__()
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
-        self.conv1 = nn.Conv2d(in_channels=1280, out_channels=640, kernel_size=3)
-        self.conv2 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=3)
+        self.conv1 = nn.Conv2d(in_channels=1280, out_channels=640, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=3)
         self.resid1 = ResidualBlock(128)
         self.resid2 = ResidualBlock(128)
@@ -200,9 +200,11 @@ class AssistantModel(torch.nn.Module):
 
     def forward(self, x8, x16, x32):
         x32 = self.upsample(x32)
-        x16 = F.relu(self.conv1(x16+x32))
+        x32 = F.relu(self.conv1(x32))
+        x16 = x16+x32
         x16 = self.upsample(x16)
-        x8 = F.relu(self.conv2(x8+x16))
+        x16 = F.relu(self.conv2(x16))
+        x8 = x8 + x16
         out = F.relu(self.conv3(x8))
         out = self.resid1(out)
         out = self.resid2(out)

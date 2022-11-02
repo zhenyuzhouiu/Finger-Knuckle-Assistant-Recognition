@@ -54,8 +54,8 @@ class Model(object):
         examples = iter(train_loader)
         example_data, example_target, example_feature8, example_feature16, example_feature32 = examples.next()
         example_anchor = example_data[:, 0:3, :, :]
-        example_positive = example_data[:, 3:3 * self.samples_subject, :, :]
-        example_negative = example_data[:, 3 * self.samples_subject:, :, :]
+        example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
+        example_negative = example_data[:, 3 * self.samples_subject:, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
         anchor_grid = torchvision.utils.make_grid(example_anchor)
         self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
         positive_grid = torchvision.utils.make_grid(example_positive)
@@ -78,7 +78,7 @@ class Model(object):
         data = Variable(data, requires_grad=False)
         self.writer.add_graph(inference, data)
 
-        assistant = AssistantModel.cuda()
+        assistant = AssistantModel().cuda()
 
         if args.shifttype == "wholeimagerotationandtranslation":
             loss = WholeImageRotationAndTranslation(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
@@ -167,7 +167,7 @@ class Model(object):
                 pos_fm = pos_fm.view(-1, 1, pos_fm.size(2), pos_fm.size(3))
                 ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
                                     pos_fm)
-                ap_loss = ap_loss.view((-1, nneg)).max(1)[0]
+                ap_loss = ap_loss.view((-1, npos)).max(1)[0]
 
                 sstl = ap_loss - an_loss + args.alpha
                 sstl = torch.clamp(sstl, min=0)
@@ -197,8 +197,8 @@ class Model(object):
                 fms_assistant = fms_assistant.view(assistant_f8.size(0), -1, fms_assistant.size(2), fms_assistant.size(3))
 
                 anchor_fm = fms_assistant[:, 0, :, :].unsqueeze(1)
-                pos_fm = fms_assistant[:, 1:self.samples_subject - 1, :, :].contiguous()
-                neg_fm = fms_assistant[:, self.samples_subject, :, :].contiguous()
+                pos_fm = fms_assistant[:, 1:self.samples_subject, :, :].contiguous()
+                neg_fm = fms_assistant[:, self.samples_subject:, :, :].contiguous()
 
                 nneg = neg_fm.size(1)
                 neg_fm = neg_fm.view(-1, 1, neg_fm.size(2), neg_fm.size(3))
@@ -212,7 +212,7 @@ class Model(object):
 
                 assistant_loss = torch.sum(assistant_sstl) / args.batch_size
 
-                assistant_sstl.backward()
+                assistant_loss.backward()
                 self.assistant_optimizer.step()
                 self.assistant_optimizer.zero_grad()
                 agg_loss_assistant += assistant_loss.item()
@@ -221,9 +221,9 @@ class Model(object):
                 agg_loss_total = agg_loss + agg_loss_assistant
                 total_loss = train_loss + train_loss_assistant
                 loop.set_description(f'Epoch [{e}/{args.epochs}]')
-                loop.set_postfix(loss_inference="{:.6f}".format(agg_loss))
-                loop.set_postfix(loss_assistant="{:.6f}".format(agg_loss_assistant))
-                loop.set_postfix(loss_total="{:.6f".format(agg_loss_total))
+                loop.set_postfix(loss_inference="{:.6f}".format(agg_loss),
+                                 loss_assistant="{:.6f}".format(agg_loss_assistant),
+                                 loss_total="{:.6f}".format(agg_loss_total))
 
             self.writer.add_scalar("lr", scalar_value=self.optimizer.state_dict()['param_groups'][0]['lr'],
                                    global_step=(e + 1))

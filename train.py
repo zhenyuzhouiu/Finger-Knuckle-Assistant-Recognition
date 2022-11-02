@@ -76,7 +76,6 @@ def main():
 
     logdir = os.path.join(args.checkpoint_dir, 'runs')
 
-
     print("[*] Target Checkpoint Path: {}".format(args.checkpoint_dir))
     if not os.path.exists(args.checkpoint_dir):
         os.makedirs(args.checkpoint_dir)

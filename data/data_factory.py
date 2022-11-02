@@ -24,7 +24,8 @@ def load_image(path, options='RGB', size=(208, 184)):
     assert (options in ["RGB", "L"])
     # the torch.ToTensor will scaling the [0, 255] to [0.0, 1.0]
     # if the numpy.ndarray has dtype = np.uint8
-    image = np.array(Image.open(path).convert(options), dtype=np.uint8)
+    src_image = np.array(Image.open(path).convert(options), dtype=np.uint8)
+    image = src_image[8:-8, :, :]
     # ration = h/w; size(w, h)
     ratio = size[1] / size[0]
     h, w, c = image.shape
@@ -43,7 +44,8 @@ def load_image(path, options='RGB', size=(208, 184)):
     else:
         crop_image = image
 
-    resize_image = cv2.resize(crop_image, size=size)
+    resize_image = cv2.resize(crop_image, dsize=size)
+
     return resize_image
 
 
@@ -64,6 +66,12 @@ def load_feature_8(path, image_name):
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
     pooled_8 = roi_align(feature_8, boxes, [32, 32])
     pooled_8 = pooled_8.squeeze(0)
+    norm_pooled_8 = pooled_8
+    for i in range(pooled_8.size(0)):
+        pooled_i = pooled_8[i, :, :]
+        mean = pooled_i.mean()
+
+
 
     return pooled_8
 

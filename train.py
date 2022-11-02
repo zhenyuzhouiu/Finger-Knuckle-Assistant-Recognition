@@ -42,7 +42,7 @@ def build_parser():
     parser.add_argument('--shifttype', type=str, dest='shifttype', default='wholeimagerotationandtranslation')
     parser.add_argument('--alpha', type=float, dest='alpha', default=20)
     parser.add_argument('--model', type=str, dest='model', default="RFNet")
-    parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128))
+    parser.add_argument('--input_size', type=int, dest='input_size', default=(208, 184), help="(w, h)")
     parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=0)
     parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=0)
     parser.add_argument('--block_size', type=int, dest="block_size", default=8)

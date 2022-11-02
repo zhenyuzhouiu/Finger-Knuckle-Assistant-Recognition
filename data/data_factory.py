@@ -13,18 +13,38 @@
 import os
 import numpy as np
 import torch
+import cv2
 
 from os.path import join, exists
 from PIL import Image
 from torchvision.ops import roi_pool, roi_align
 
 
-def load_image(path, options='RGB'):
+def load_image(path, options='RGB', size=(208, 184)):
     assert (options in ["RGB", "L"])
     # the torch.ToTensor will scaling the [0, 255] to [0.0, 1.0]
     # if the numpy.ndarray has dtype = np.uint8
     image = np.array(Image.open(path).convert(options), dtype=np.uint8)
-    return image
+    # ration = h/w; size(w, h)
+    ratio = size[1] / size[0]
+    h, w, c = image.shape
+    dest_w = h / ratio
+    dest_h = w * ratio
+    if dest_w > w:
+        crop_h = int((h - dest_h) / 2)
+        if crop_h == 0:
+            crop_h = 1
+        crop_image = image[crop_h - 1:crop_h + int(dest_h), :, :]
+    elif dest_h > h:
+        crop_w = int((w - dest_w) / 2)
+        if crop_w == 0:
+            crop_w = 1
+        crop_image = image[:, crop_w - 1:crop_w + int(dest_w), :]
+    else:
+        crop_image = image
+
+    resize_image = cv2.resize(crop_image, size=size)
+    return resize_image
 
 
 def load_feature_8(path, image_name):
@@ -107,7 +127,7 @@ def reminderpick_list(src, list_except=None):
 
 
 class Factory(torch.utils.data.Dataset):
-    def __init__(self, img_path, feature_path,
+    def __init__(self, img_path, feature_path, input_size,
                  transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True):
         self.ext = valid_ext
         self.transform = transform
@@ -115,6 +135,7 @@ class Factory(torch.utils.data.Dataset):
         self.folder = img_path
         self.feature_folder = feature_path
         self.train = train
+        self.input_size = input_size
 
         if not exists(self.folder):
             raise RuntimeError('Dataset not found: {}'.format(self.folder))
@@ -184,12 +205,12 @@ class Factory(torch.utils.data.Dataset):
         # img = []
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L'), -1))
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
-        img = [load_image(join(self.folder, selected_folder, anchor), options='RGB')]
+        img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
         stride_8 = load_feature_8(join(self.feature_folder, selected_folder), image_name=anchor)
         stride_16 = load_feature_16(join(self.feature_folder, selected_folder), image_name=anchor)
         stride_32 = load_feature_32(join(self.feature_folder, selected_folder), image_name=anchor)
         for p in positive:
-            img.append(load_image(join(self.folder, selected_folder, p), options='RGB'))
+            img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
             stride_8 = torch.cat([stride_8, load_feature_8(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
             stride_16 = torch.cat([stride_16, load_feature_16(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
             stride_32 = torch.cat([stride_32, load_feature_32(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
@@ -200,7 +221,7 @@ class Factory(torch.utils.data.Dataset):
             list_folders.append(negative_folder)
             negative = reminderpick_list(self.fdict[negative_folder])
             for n in negative:
-                img.append(load_image(join(self.folder, negative_folder, n), options='RGB'))
+                img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
                 stride_8 = torch.cat(
                     [stride_8, load_feature_8(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
                 stride_16 = torch.cat(

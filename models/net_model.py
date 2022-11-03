@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from models.net_common import ConvLayer, ResidualBlock, \
     DeformableConv2d2v
-from EfficientNetV2 import
+from EfficientNetV2 import fk_efficientnetv2_s_nohead
 
 
 def _init_vit_weights(m):
@@ -247,14 +247,20 @@ class FusionModel(torch.nn.Module):
         self.bn3 = nn.BatchNorm2d(num_features=128)
 
         # extract finger knuckle features
+        self.fknet = fk_efficientnetv2_s_nohead()
 
-
-        # fuse feature maps by adding
+        # fuse feature maps by add
+        self.resid1 = ResidualBlock(128)
+        self.resid2 = ResidualBlock(128)
+        self.conv4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3)
+        self.bn4 = nn.BatchNorm2d(num_features=64)
+        self.conv4 = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=3)
+        self.bn5 = nn.BatchNorm2d(num_features=1)
 
 
 
     def forward(self, x, s8, s16, s32):
-        # fuse yolov5 features
+        # fuse yolov5 features output [b, 128, 32, 32]
         s32 = F.sigmoid(self.reduce1(s32))
         s16 = F.sigmoid(self.reduce2(s16))
         s8 = F.sigmoid(self.reduce3(s8))
@@ -265,6 +271,21 @@ class FusionModel(torch.nn.Module):
         s16 = F.relu(self.bn2(self.conv2(s16)))
         s8 = s8 + s16
         s8 = F.relu(self.bn3(self.conv3(s8)))
+
+        # extract finger knuckle features output [b, 128, 32, 32]
+        x = self.fknet(x)
+
+        # fuse feature maps by concat
+        # [b, 256, 32, 32]
+        # out = torch.cat([x, s8], dim=1)
+        out = x + s8
+        out = self.resid1(out)
+        out = self.resid2(out)
+        out = F.relu(self.bn4(self.conv4(out)))
+        out = F.relu(self.bn5(self.conv5(out)))
+
+        return out
+
 
 
 

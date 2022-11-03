@@ -402,11 +402,11 @@ class FKEfficientNetV2(nn.Module):
         return x
 
 
-class FKEfficientNetV2_head(nn.Module):
+class FKEfficientNetV2_Nohead(nn.Module):
     def __init__(self,
                  model_cnf: list,
                  drop_connect_rate: float = 0.2):
-        super(FKEfficientNetV2, self).__init__()
+        super(FKEfficientNetV2_Nohead, self).__init__()
 
         for cnf in model_cnf:
             assert len(cnf) == 8
@@ -439,23 +439,6 @@ class FKEfficientNetV2_head(nn.Module):
                 block_id += 1
         self.blocks = nn.Sequential(*blocks)
 
-        head_input_c = model_cnf[-1][-3]
-        head = OrderedDict()
-        # head_input_c of fk_efficientnetv2_s: 128
-        head.update({"conv1": ConvBNAct(head_input_c,
-                                        64,
-                                        kernel_size=3,
-                                        stride=1,
-                                        norm_layer=norm_layer)})  # 激活函数默认是SiLU
-
-        head.update({"conv2": ConvBNAct(64,
-                                        1,
-                                        kernel_size=3,
-                                        stride=1,
-                                        norm_layer=norm_layer)})  # 激活函数默认是SiLU
-
-        self.head = nn.Sequential(head)
-
         # initial weights
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -477,10 +460,9 @@ class FKEfficientNetV2_head(nn.Module):
         b, c, h, w = x.size()
         box = torch.tensor([0, 0, w - 1, h - 1]).float()
         list_box = [box]*b
-        x = roi_align(x, list_box, [32, 32])
 
-        x = self.head(x)
-        # output x.size() [b, 1, 32, 32]
+        # output x.size() [b, 128, 32, 32]
+        x = roi_align(x, list_box, [32, 32])
 
         return x
 
@@ -496,6 +478,22 @@ def fk_efficientnetv2_s():
 
     model = FKEfficientNetV2(model_cnf=model_config,
                              drop_connect_rate=0.2)
+
+    return model
+
+
+def fk_efficientnetv2_s_nohead():
+    """
+    FK_EfficientNetV2_Nohead
+    The original EfficientNetV2 is too deep,
+    """
+    # repeat, kernel, stride, expansion, in_c, out_c, operator, se_ratio
+    model_config = [[2, 3, 1, 4, 32, 32, 1, 0.25],
+                    [4, 3, 2, 4, 32, 64, 1, 0.25],
+                    [6, 3, 2, 4, 64, 128, 1, 0.25]]
+
+    model = FKEfficientNetV2_Nohead(model_cnf=model_config,
+                                    drop_connect_rate=0.2)
 
     return model
 

@@ -402,6 +402,88 @@ class FKEfficientNetV2(nn.Module):
         return x
 
 
+class FKEfficientNetV2_head(nn.Module):
+    def __init__(self,
+                 model_cnf: list,
+                 drop_connect_rate: float = 0.2):
+        super(FKEfficientNetV2, self).__init__()
+
+        for cnf in model_cnf:
+            assert len(cnf) == 8
+
+        norm_layer = partial(nn.BatchNorm2d, eps=1e-3, momentum=0.1)
+
+        stem_filter_num = model_cnf[0][4]
+
+        self.stem = ConvBNAct(3,
+                              stem_filter_num,
+                              kernel_size=3,
+                              stride=2,
+                              norm_layer=norm_layer)  # 激活函数默认是SiLU
+
+        total_blocks = sum([i[0] for i in model_cnf])
+        block_id = 0
+        blocks = []
+        for cnf in model_cnf:
+            repeats = cnf[0]
+            op = FusedMBConv if cnf[-2] == 0 else MBConv
+            for i in range(repeats):
+                blocks.append(op(kernel_size=cnf[1],
+                                 input_c=cnf[4] if i == 0 else cnf[5],
+                                 out_c=cnf[5],
+                                 expand_ratio=cnf[3],
+                                 stride=cnf[2] if i == 0 else 1,
+                                 se_ratio=cnf[-1],
+                                 drop_rate=drop_connect_rate * block_id / total_blocks,
+                                 norm_layer=norm_layer))
+                block_id += 1
+        self.blocks = nn.Sequential(*blocks)
+
+        head_input_c = model_cnf[-1][-3]
+        head = OrderedDict()
+        # head_input_c of fk_efficientnetv2_s: 128
+        head.update({"conv1": ConvBNAct(head_input_c,
+                                        64,
+                                        kernel_size=3,
+                                        stride=1,
+                                        norm_layer=norm_layer)})  # 激活函数默认是SiLU
+
+        head.update({"conv2": ConvBNAct(64,
+                                        1,
+                                        kernel_size=3,
+                                        stride=1,
+                                        norm_layer=norm_layer)})  # 激活函数默认是SiLU
+
+        self.head = nn.Sequential(head)
+
+        # initial weights
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out")
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.zeros_(m.bias)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.stem(x)
+        x = self.blocks(x)
+
+        # using ROI Align operations to align feature to the same size
+        b, c, h, w = x.size()
+        box = torch.tensor([0, 0, w - 1, h - 1]).float()
+        list_box = [box]*b
+        x = roi_align(x, list_box, [32, 32])
+
+        x = self.head(x)
+        # output x.size() [b, 1, 32, 32]
+
+        return x
+
 def fk_efficientnetv2_s():
     """
     FK_EfficientNetV2

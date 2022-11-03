@@ -4,7 +4,7 @@
 # =========================================================
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import argparse
 import shutil
@@ -41,7 +41,7 @@ def build_parser():
     # Pre-defined Options
     parser.add_argument('--shifttype', type=str, dest='shifttype', default='wholeimagerotationandtranslation')
     parser.add_argument('--alpha', type=float, dest='alpha', default=20)
-    parser.add_argument('--model', type=str, dest='model', default="RFNet")
+    parser.add_argument('--model', type=str, dest='model', default="FusionNet")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(208, 184), help="(w, h)")
     parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=4)
     parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=4)
@@ -91,7 +91,8 @@ def main():
 
     writer = SummaryWriter(log_dir=logdir)
     model_ = Model(args, writer=writer)
-    model_.triplet_train(args)
+    # model_.triplet_train(args)
+    model_.fusion_triplet_train(args)
 
 
 if __name__ == "__main__":

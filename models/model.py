@@ -29,7 +29,7 @@ model_dict = {
     "FKEfficientNet": fk_efficientnetv2_s().cuda(),
     "RFNWithSTNet": RFNWithSTNet().cuda(),
     "ConvNet": ConvNet().cuda(),
-    "FusionNet": FusionModel.cuda()
+    "FusionNet": FusionModel().cuda()
 }
 
 
@@ -41,7 +41,8 @@ class Model(object):
         self.train_loader, self.dataset_size = self._build_dataset_loader(args)
         self.inference, self.assistant, self.loss = self._build_model(args)
         self.optimizer = torch.optim.Adam(self.inference.parameters(), args.learning_rate)
-        self.assistant_optimizer = torch.optim.Adam(self.assistant.parameters(), args.learning_rate*0.1)
+        if self.assistant != 0:
+            self.assistant_optimizer = torch.optim.Adam(self.assistant.parameters(), args.learning_rate*0.1)
 
     def _build_dataset_loader(self, args):
         transform = transforms.Compose([
@@ -72,12 +73,19 @@ class Model(object):
                 param_group['lr'] *= lr_decay
 
     def _build_model(self, args):
-        if args.model not in ["RFNet", "DeConvRFNet", "FKEfficientNet", "RFNWithSTNet", "ConvNet"]:
+        if args.model not in ["RFNet", "DeConvRFNet", "FKEfficientNet", "RFNWithSTNet", "ConvNet", "FusionNet"]:
             raise RuntimeError('Model not found')
-        inference = model_dict[args.model].cuda().eval()
-        data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
-        data = Variable(data, requires_grad=False)
-        self.writer.add_graph(inference, data)
+        inference = model_dict[args.model].cuda()
+        # inference = model_dict[args.model].cuda().eval()
+        # data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
+        # data = Variable(data, requires_grad=False)
+        # s32 = torch.randn([1280, 8, 8]).unsqueeze(0).cuda()
+        # s32 = Variable(s32, requires_grad=False)
+        # s16 = torch.randn([640, 16, 16]).unsqueeze(0).cuda()
+        # s16 = Variable(s16, requires_grad=False)
+        # s8 = torch.randn([320, 32, 32]).unsqueeze(0).cuda()
+        # s8 = Variable(s8, requires_grad=False)
+        # self.writer.add_graph(inference, [data, s8, s16, s32])
 
         if args.shifttype == "wholeimagerotationandtranslation":
             loss = WholeImageRotationAndTranslation(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()

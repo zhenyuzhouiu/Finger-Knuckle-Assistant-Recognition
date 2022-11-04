@@ -58,9 +58,9 @@ def calc_feats_more(test_path, assistant_path, usr, size=(208, 184)):
     s8 = torch.zeros([len(image_names), 320, 32, 32], dtype=torch.float32)
     s16 = torch.zeros([len(image_names), 640, 16, 16], dtype=torch.float32)
     s32 = torch.zeros([len(image_names), 1280, 8, 8], dtype=torch.float32)
-    for i in image_names:
+    for i, imname in enumerate(image_names):
         # ========================== read segmented finger knuckle
-        image_path = os.path.join(subject_path, i)
+        image_path = os.path.join(subject_path, imname)
         ratio = size[1] / size[0]
         image = np.array(
             Image.open(image_path).convert('RGB'),
@@ -87,7 +87,7 @@ def calc_feats_more(test_path, assistant_path, usr, size=(208, 184)):
         im = torch.from_numpy(np.transpose(resize_image, (2, 0, 1)).astype(np.float32)/255.).unsqueeze(0)
         x[i, :, :, :] = im
         # ========================================== read yolov5 feature maps
-        prefix_name = i.split('.')[0]
+        prefix_name = imname.split('.')[0]
         # =========
         # feature_8.shape:-> h*w*320
         feature_8 = np.load(join(assistant_path, usr, prefix_name + '-8.npy'))
@@ -189,24 +189,24 @@ def genuine_imposter(test_path, assistant_path, image_size):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/dataset/THU-FVFDT/FDT3_Train/major/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-little-crop/",
                     dest="test_path")
 parser.add_argument("--assistant_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/dataset/THU-FVFDT/FDT3_Train/major/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-little-feature/",
                     dest="assistant_path")
 parser.add_argument("--out_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/checkpoint/RFNet-TL/fkv3(yolov5)-session2_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-07-18-10-15/output/crossthu-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_FusionNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-03-21-36/output/little-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/checkpoint/RFNet-TL/fkv3(yolov5)-session2_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-07-18-10-15/ckpt_epoch_6000.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_FusionNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-03-21-36/ckpt_epoch_2180.pth",
                     dest="model_path")
 parser.add_argument("--default_size", type=int, dest="default_size", default=(208, 184))
-parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
+parser.add_argument("--shift_size", type=int, dest="shift_size", default=4)
 parser.add_argument('--block_size', type=int, dest="block_size", default=8)
-parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=0)
+parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=4)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-parser.add_argument('--model', type=str, dest='model', default="RFNet")
+parser.add_argument('--model', type=str, dest='model', default="FusionModel")
 
 model_dict = {
     "RFNet": models.net_model.ResidualFeatureNet().cuda(),

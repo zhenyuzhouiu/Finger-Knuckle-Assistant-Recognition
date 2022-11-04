@@ -190,21 +190,21 @@ def genuine_imposter(test_path, assistant_path, image_size):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-little-crop/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-index-crop/",
                     dest="test_path")
 parser.add_argument("--assistant_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-little-feature/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-index-feature/",
                     dest="assistant_path")
 parser.add_argument("--out_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_FusionNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-03-21-36/output/little-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_FusionNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-11-04-00-02/output/index-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_FusionNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-03-21-36/ckpt_epoch_2180.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_FusionNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-11-04-00-02/ckpt_epoch_3000.pth",
                     dest="model_path")
 parser.add_argument("--default_size", type=int, dest="default_size", default=(208, 184))
-parser.add_argument("--shift_size", type=int, dest="shift_size", default=4)
+parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
 parser.add_argument('--block_size', type=int, dest="block_size", default=8)
-parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=4)
+parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=0)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
 parser.add_argument('--model', type=str, dest='model', default="FusionModel")
@@ -266,7 +266,7 @@ def _loss(feats1, feats2):
 inference = inference.cuda()
 inference.eval()
 
-gscores, iscores, mmat = genuine_imposter(args.test_path, args.assistant_path, args.default_size)
+gscores, iscores, _, mmat = genuine_imposter(args.test_path, args.assistant_path, args.default_size)
 if args.save_mmat:
     np.save(args.out_path, {"g_scores": gscores, "i_scores": iscores, "mmat": mmat})
 else:

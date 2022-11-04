@@ -14,6 +14,7 @@ import sys
 from PIL import Image
 import numpy as np
 import torch
+import cv2
 import argparse
 from torch.autograd import Variable
 import models.EfficientNetV2
@@ -31,20 +32,49 @@ sys.path.insert(0, parent_dir)
 transform = transforms.Compose([transforms.ToTensor()])
 
 
-def calc_feats_more(*paths):
-    container = np.zeros((len(paths), 3, args.default_size, args.default_size))
+def calc_feats_more(*paths, size=(208, 184)):
+    """
+    1.Read a batch of images from the given paths
+    2.Normalize image from 0-255 to 0-1
+    3.Get a batch of feature from the model inference()
+    """
+    size = args.default_size
+    w, h = size[0], size[1]
+    ratio = size[1] / size[0]
+    container = np.zeros((len(paths), 3, h, w))
     for i, path in enumerate(paths):
-        im = np.array(
-            Image.open(path).convert("RGB").resize((args.default_size, args.default_size)),
+        image = np.array(
+            Image.open(path).convert('RGB').resize(size=size),
             dtype=np.float32
         )
-        im = np.transpose(im, (2, 0, 1))
+        image = image[8:-8, :, :]
+        h, w, c = image.shape
+        dest_w = h / ratio
+        dest_h = w * ratio
+        if dest_w > w:
+            crop_h = int((h - dest_h) / 2)
+            if crop_h == 0:
+                crop_h = 1
+            crop_image = image[crop_h - 1:crop_h + int(dest_h), :, :]
+        elif dest_h > h:
+            crop_w = int((w - dest_w) / 2)
+            if crop_w == 0:
+                crop_w = 1
+            crop_image = image[:, crop_w - 1:crop_w + int(dest_w), :]
+        else:
+            crop_image = image
+        resize_image = cv2.resize(crop_image, dsize=size)
+        # change hxwxc = cxhxw
+        im = np.transpose(resize_image, (2, 0, 1))
         container[i, :, :, :] = im
     container /= 255.
     container = torch.from_numpy(container.astype(np.float32))
     container = container.cuda()
     container = Variable(container, requires_grad=False)
     fv = inference(container)
+    # traced_script_module = torch.jit.trace(inference, container)
+    # traced_script_module.save("traced_450.pt")
+
     return fv.cpu().data.numpy()
 
 
@@ -97,15 +127,15 @@ def genuine_imposter(test_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/right-yolov5x-csl/right-little-resize/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-little-crop/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-10-20-17-25/output/right-little.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/little-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-10-20-17-25/ckpt_epoch_3820.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/ckpt_epoch_2020.pth",
                     dest="model_path")
-parser.add_argument("--default_size", type=int, dest="default_size", default=128)
+parser.add_argument("--default_size", type=int, dest="default_size", default=(208, 184))
 parser.add_argument("--shift_size", type=int, dest="shift_size", default=4)
 parser.add_argument('--block_size', type=int, dest="block_size", default=8)
 parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=4)

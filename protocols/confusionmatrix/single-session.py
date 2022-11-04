@@ -22,6 +22,7 @@ import sys
 from PIL import Image
 import numpy as np
 import math
+import cv2
 import torch
 import argparse
 from torch.autograd import Variable
@@ -66,7 +67,7 @@ def calc_feats(path):
     return fv.cpu().data.numpy()
 
 
-def calc_feats_more(*paths):
+def calc_feats_more(*paths, size=(208, 184)):
     """
     1.Read a batch of images from the given paths
     2.Normalize image from 0-255 to 0-1
@@ -74,14 +75,32 @@ def calc_feats_more(*paths):
     """
     size = args.default_size
     w, h = size[0], size[1]
+    ratio = size[1] / size[0]
     container = np.zeros((len(paths), 3, h, w))
     for i, path in enumerate(paths):
-        im = np.array(
+        image = np.array(
             Image.open(path).convert('RGB').resize(size=size),
             dtype=np.float32
         )
+        image = image[8:-8, :, :]
+        h, w, c = image.shape
+        dest_w = h / ratio
+        dest_h = w * ratio
+        if dest_w > w:
+            crop_h = int((h - dest_h) / 2)
+            if crop_h == 0:
+                crop_h = 1
+            crop_image = image[crop_h - 1:crop_h + int(dest_h), :, :]
+        elif dest_h > h:
+            crop_w = int((w - dest_w) / 2)
+            if crop_w == 0:
+                crop_w = 1
+            crop_image = image[:, crop_w - 1:crop_w + int(dest_w), :]
+        else:
+            crop_image = image
+        resize_image = cv2.resize(crop_image, dsize=size)
         # change hxwxc = cxhxw
-        im = np.transpose(im, (2, 0, 1))
+        im = np.transpose(resize_image, (2, 0, 1))
         container[i, :, :, :] = im
     container /= 255.
     container = torch.from_numpy(container.astype(np.float32))
@@ -111,29 +130,18 @@ def genuine_imposter(test_path):
     # for example, for hd(1-4), matching_matrix.shape = (714x4, 714x4)
     matching_matrix = np.ones((nsubs * nims, nsubs * nims)) * 1000000
     for i in range(1, feats_all.size(0)):
-        feat1 = feats_all[:-i, :, :, :]
-        feat2 = feats_all[i:, :, :, :]
-        # loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :])
-        loss = _loss(feat1, feat2)
+        loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :])
         matching_matrix[:-i, i] = loss
         print("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
         # sys.stdout.write("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
         # sys.stdout.flush()
 
-    matt = np.ones_like(matching_matrix) * 1000000
+    matt = np.ones_like(matching_matrix) * 1e5
     matt[0, :] = matching_matrix[0, :]
     for i in range(1, feats_all.size(0)):
-        # matching_matrix每行的数值向后移动一位
         matt[i, i:] = matching_matrix[i, :-i]
         for j in range(i):
-            # matt[i, j] = matt[j, i]
             matt[i, j] = matching_matrix[j, i - j]
-
-    # matt is the matching score of
-    #   1  A1A2 A1A3 A1A4
-    # A2A1  1   A2A3 A2A4
-    # A3A1 A3A2  1   A3A4
-    # A4A1 A4A2 A4A3  1
     print("\n [*] Done")
 
     g_scores = []
@@ -163,18 +171,18 @@ def genuine_imposter(test_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/dataset/THU-FVFDT/FDT3_Train/major/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-index-crop/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/checkpoint/RFNet-TL/fkv3(yolov5)-session2_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-07-18-10-15/output/crossthu-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/index-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/checkpoint/RFNet-TL/fkv3(yolov5)-session2_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-07-18-10-15/ckpt_epoch_6000.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/ckpt_epoch_2020.pth",
                     dest="model_path")
-parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
-parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
+parser.add_argument("--default_size", type=int, dest="default_size", default=(208, 184))
+parser.add_argument("--shift_size", type=int, dest="shift_size", default=4)
 parser.add_argument('--block_size', type=int, dest="block_size", default=8)
-parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=0)
+parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=4)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
 parser.add_argument('--model', type=str, dest='model', default="RFNet")

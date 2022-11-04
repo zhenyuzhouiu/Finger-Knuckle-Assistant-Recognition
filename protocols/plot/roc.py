@@ -12,9 +12,9 @@ import argparse
 from plotroc_basic import *
 
 
-src_npy = ['/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/matching_matrix/left_little_matching_matrix.npy',
-           '/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/matching_matrix/left_ring_matching_matrix.npy',
-           '/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/matching_matrix/left_middle_matching_matrix.npy',
+src_npy = ['/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/leave-one-out/index-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/leave-one-out/ring-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/leave-one-out/little-protocol.npy',
            '/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/matching_matrix/left_index_matching_matrix.npy',
            '/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/codekevin/fknet/test/rfn-tl/fkv3-two-session-protocol.npy',
            '/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/codekevin/fknet/test/rfn-tl/hd-protocol.npy',
@@ -23,9 +23,9 @@ src_npy = ['/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Fin
            '/home/zhenyuzhou/Desktop/Finger-Knuckle-Assistant-Recognition/output/ConvNetVSRFNet/fkv3-session2_STNetConvNetEfficientNet-shiftedloss-lr1e-06-protocol.npy',
            '/home/zhenyuzhou/Desktop/Finger-Knuckle-Assistant-Recognition/output/ConvNetVSRFNet/fkv3-session2_STNetConvNetEfficientNet-shiftedloss-lr1e-07-protocol.npy',]
 
-label = ['Left-Little',
+label = ['Left-Index',
          'Left-Ring',
-         'Left-Middle',
+         'Left-Little',
          'Left-Index',
          'FirstSTNetThenConvNetMiddleEfficientNet-shiftedloss-lr0.01-500',
          'FirstSTNetThenConvNetMiddleEfficientNet-shiftedloss-lr0.01',
@@ -47,9 +47,9 @@ color = ['#ff0000',
          '#808000',
          '#ff00ff',
          '#ff0000']
-dst = '/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/matching_matrix/roc.pdf'
+dst = '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/leave-one-out/roc.pdf'
 
-for i in range(4):
+for i in range(3):
     data = np.load(src_npy[i], allow_pickle=True)[()]
     g_scores = np.array(data['g_scores'])
     i_scores = np.array(data['i_scores'])

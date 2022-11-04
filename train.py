@@ -34,14 +34,14 @@ def build_parser():
     # Training Strategy
     parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
-    parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=1e-3)
+    parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=1e-5)
 
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
     # Pre-defined Options
     parser.add_argument('--shifttype', type=str, dest='shifttype', default='wholeimagerotationandtranslation')
     parser.add_argument('--alpha', type=float, dest='alpha', default=20)
-    parser.add_argument('--model', type=str, dest='model', default="FusionNet")
+    parser.add_argument('--model', type=str, dest='model', default="AssistantModel")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(208, 184), help="(w, h)")
     parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=0)
     parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=0)
@@ -92,7 +92,8 @@ def main():
     writer = SummaryWriter(log_dir=logdir)
     model_ = Model(args, writer=writer)
     # model_.triplet_train(args)
-    model_.fusion_triplet_train(args)
+    # model_.fusion_triplet_train(args)
+    model_.assistant_triplet_train(args)
 
 
 if __name__ == "__main__":

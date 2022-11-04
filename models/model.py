@@ -191,7 +191,6 @@ class Model(object):
 
         self.writer.close()
 
-
     def assistant_triplet_train(self, args):
         epoch_steps = len(self.train_loader)
         train_loss = 0
@@ -220,7 +219,7 @@ class Model(object):
                 assistant_f32 = assistant_f32.cuda()
                 assistant_f32 = Variable(assistant_f32, requires_grad=False)
 
-                fms_assistant = self.assistant(assistant_f8.view(-1, 320, assistant_f8.size(2), assistant_f8.size(3)),
+                fms_assistant = self.inference(assistant_f8.view(-1, 320, assistant_f8.size(2), assistant_f8.size(3)),
                                                assistant_f16.view(-1, 640, assistant_f16.size(2), assistant_f16.size(3)),
                                                assistant_f32.view(-1, 1280, assistant_f32.size(2), assistant_f32.size(3)))
 

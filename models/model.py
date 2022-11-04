@@ -29,7 +29,8 @@ model_dict = {
     "FKEfficientNet": fk_efficientnetv2_s().cuda(),
     "RFNWithSTNet": RFNWithSTNet().cuda(),
     "ConvNet": ConvNet().cuda(),
-    "FusionNet": FusionModel().cuda()
+    "FusionNet": FusionModel().cuda(),
+    "AssistantModel": AssistantModel().cuda()
 }
 
 
@@ -39,10 +40,8 @@ class Model(object):
         self.batch_size = args.batch_size
         self.samples_subject = args.samples_subject
         self.train_loader, self.dataset_size = self._build_dataset_loader(args)
-        self.inference, self.assistant, self.loss = self._build_model(args)
+        self.inference, self.loss = self._build_model(args)
         self.optimizer = torch.optim.Adam(self.inference.parameters(), args.learning_rate)
-        if self.assistant != 0:
-            self.assistant_optimizer = torch.optim.Adam(self.assistant.parameters(), args.learning_rate*0.1)
 
     def _build_dataset_loader(self, args):
         transform = transforms.Compose([
@@ -73,7 +72,8 @@ class Model(object):
                 param_group['lr'] *= lr_decay
 
     def _build_model(self, args):
-        if args.model not in ["RFNet", "DeConvRFNet", "FKEfficientNet", "RFNWithSTNet", "ConvNet", "FusionNet"]:
+        if args.model not in ["RFNet", "DeConvRFNet", "FKEfficientNet",
+                              "RFNWithSTNet", "ConvNet", "FusionNet", "AssistantModel"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         # inference = model_dict[args.model].cuda().eval()
@@ -112,22 +112,12 @@ class Model(object):
                     inference.cuda()
                 else:
                     raise RuntimeError('Model loss not found')
-        assistant = 0
 
-        if args.model == "FKEfficientNet":
-            assistant = AssistantModel().cuda()
-            assistant.train()
-            assistant.cuda()
-
-            return inference, assistant, loss
-        else:
-            return inference, 0, loss
+        return inference, loss
 
     def triplet_train(self, args):
         epoch_steps = len(self.train_loader)
-        total_loss = 0
         train_loss = 0
-        train_loss_assistant = 0
         start_epoch = ''.join(x for x in os.path.basename(args.start_ckpt) if x.isdigit())
         if start_epoch:
             start_epoch = int(start_epoch) + 1
@@ -142,9 +132,6 @@ class Model(object):
             # self.exp_lr_scheduler(e, lr_decay_epoch=100)
             self.inference.train()
             agg_loss = 0.
-            self.assistant.train()
-            agg_loss_assistant = 0.
-            agg_loss_total = 0.
             # for batch_id, (x, _) in enumerate(self.train_loader):
             # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
             loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
@@ -187,6 +174,43 @@ class Model(object):
                 agg_loss += loss.item()
                 train_loss += loss.item()
 
+                loop.set_description(f'Epoch [{e}/{args.epochs}]')
+                loop.set_postfix(loss_inference="{:.6f}".format(agg_loss))
+
+            self.writer.add_scalar("lr", scalar_value=self.optimizer.state_dict()['param_groups'][0]['lr'],
+                                   global_step=(e + 1))
+            self.writer.add_scalar("loss_inference", scalar_value=train_loss,
+                                   global_step=((e + 1) * epoch_steps))
+
+            train_loss = 0
+
+            if args.checkpoint_dir is not None and e % args.checkpoint_interval == 0:
+                self.save(args.checkpoint_dir, e)
+
+            scheduler.step()
+
+        self.writer.close()
+
+
+    def assistant_triplet_train(self, args):
+        epoch_steps = len(self.train_loader)
+        train_loss = 0
+        start_epoch = ''.join(x for x in os.path.basename(args.start_ckpt) if x.isdigit())
+        if start_epoch:
+            start_epoch = int(start_epoch) + 1
+            self.load(args.start_ckpt)
+        else:
+            start_epoch = 1
+
+        # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
+        scheduler = MultiStepLR(self.optimizer, milestones=[10, 500, 1000], gamma=0.1)
+
+        for e in range(start_epoch, args.epochs + start_epoch):
+            # self.exp_lr_scheduler(e, lr_decay_epoch=100)
+            self.inference.train()
+            agg_loss = 0.
+            loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
+            for batch_id, (x, _, assistant_f8, assistant_f16, assistant_f32) in loop:
                 # ============================================================== train assistant model
                 # assistant_f8.shape :-> [b, 320*3*samples_subject, 32, 32]
                 assistant_f8 = assistant_f8.cuda()
@@ -218,36 +242,24 @@ class Model(object):
                 ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)), pos_fm)
                 ap_loss = ap_loss.view((-1, npos)).max(1)[0]
 
-                assistant_sstl = ap_loss - an_loss + args.alpha
-                assistant_sstl = torch.clamp(assistant_sstl, min=0)
+                sstl = ap_loss - an_loss + args.alpha
+                sstl = torch.clamp(sstl, min=0)
 
-                assistant_loss = torch.sum(assistant_sstl) / args.batch_size
-
-                assistant_loss.backward()
-                self.assistant_optimizer.step()
-                self.assistant_optimizer.zero_grad()
-                agg_loss_assistant += assistant_loss.item()
-                train_loss_assistant += assistant_loss.item()
-                # ================================================================= total loss = inference loss + assistant loss
-                agg_loss_total = agg_loss + agg_loss_assistant
-                total_loss = train_loss + train_loss_assistant
+                loss = torch.sum(sstl) / args.batch_size
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                agg_loss += loss.item()
+                train_loss += loss.item()
                 loop.set_description(f'Epoch [{e}/{args.epochs}]')
-                loop.set_postfix(loss_inference="{:.6f}".format(agg_loss),
-                                 loss_assistant="{:.6f}".format(agg_loss_assistant),
-                                 loss_total="{:.6f}".format(agg_loss_total))
+                loop.set_postfix(loss_inference="{:.6f}".format(agg_loss))
 
             self.writer.add_scalar("lr", scalar_value=self.optimizer.state_dict()['param_groups'][0]['lr'],
                                    global_step=(e + 1))
             self.writer.add_scalar("loss_inference", scalar_value=train_loss,
                                    global_step=((e + 1) * epoch_steps))
-            self.writer.add_scalar("loss_assistant", scalar_value=train_loss_assistant,
-                                   global_step=((e + 1) * epoch_steps))
-            self.writer.add_scalar("loss_total", scalar_value=total_loss,
-                                   global_step=((e + 1) * epoch_steps))
 
             train_loss = 0
-            train_loss_assistant = 0
-            total_loss = 0
 
             if args.checkpoint_dir is not None and e % args.checkpoint_interval == 0:
                 self.save(args.checkpoint_dir, e)

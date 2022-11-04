@@ -64,7 +64,8 @@ def load_feature_8(path, image_name):
     # h*w*320 -> 320*h*w -> 1*320*h*w
     feature_8 = torch.from_numpy(np.expand_dims(np.transpose(feature_8, axes=(2, 0, 1)), axis=0)).float()
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-    pooled_8 = roi_align(feature_8, boxes, [32, 32])
+    # output_size (height, width).
+    pooled_8 = roi_align(feature_8, boxes, [22, 26])
     pooled_8 = pooled_8.squeeze(0)
     norm_pooled_8 = pooled_8
     # for i in range(pooled_8.size(0)):
@@ -90,7 +91,7 @@ def load_feature_16(path, image_name):
     # h*w*640 -> 640*h*w -> 1*640*h*w
     feature_16 = torch.from_numpy(np.expand_dims(np.transpose(feature_16, axes=(2, 0, 1)), axis=0)).float()
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-    pooled_16 = roi_align(feature_16, boxes, [16, 16])
+    pooled_16 = roi_align(feature_16, boxes, [12, 14])
     pooled_16 = pooled_16.squeeze(0)
     norm_pooled_16 = pooled_16
     # for i in range(pooled_16.size(0)):
@@ -116,7 +117,7 @@ def load_feature_32(path, image_name):
     # h*w*1280 -> 1280*h*w -> 1*1280*h*w
     feature_32 = torch.from_numpy(np.expand_dims(np.transpose(feature_32, axes=(2, 0, 1)), axis=0)).float()
     boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-    pooled_32 = roi_align(feature_32, boxes, [8, 8])
+    pooled_32 = roi_align(feature_32, boxes, [7, 8])
     pooled_32 = pooled_32.squeeze(0)
     norm_pooled_32 = pooled_32
     # for i in range(pooled_32.size(0)):

@@ -221,9 +221,9 @@ class AssistantModel(torch.nn.Module):
         self.reduce3 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=1)
 
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
-        self.conv1 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=3)
         self.bn1 = nn.BatchNorm2d(num_features=320)
-        self.conv2 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=3)
         self.bn2 = nn.BatchNorm2d(num_features=128)
         self.conv3 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3)
         self.bn3 = nn.BatchNorm2d(num_features=64)
@@ -234,6 +234,9 @@ class AssistantModel(torch.nn.Module):
         self.conv5 = nn.Conv2d(in_channels=32, out_channels=1, kernel_size=3)
 
     def forward(self, x8, x16, x32):
+        # x8.shape():-> [b, 320, 22, 26]
+        # x16.shape():-> [b, 640, 12, 14]
+        # x32.shape():-> [b, 1280, 7, 8]
         x32 = F.sigmoid(self.reduce1(x32))
         x16 = F.sigmoid(self.reduce2(x16))
         x8 = F.sigmoid(self.reduce3(x8))
@@ -249,6 +252,7 @@ class AssistantModel(torch.nn.Module):
         out = self.resid2(out)
         out = F.relu(self.bn4(self.conv4(out)))
         out = F.relu(self.conv5(out))
+        # out.shape():-> [b, c, 16, 20]
 
         return out
 

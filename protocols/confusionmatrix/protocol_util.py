@@ -30,3 +30,15 @@ def subimages(src, preserve_prefix=False, ext=["JPG", "bmp", "jpg"]):
         return [join(src, f) for f in os.listdir(src) if _hasext(f)]
     else:
         return [f for f in os.listdir(src) if ext in f]
+
+def subfeatures(src, preserve_prefix=False, ext=["npy"]):
+    def _hasext(f):
+        for ext_ in ext:
+            if ext_ in f:
+                return True
+        return False
+
+    if preserve_prefix:
+        return [join(src, f) for f in os.listdir(src) if _hasext(f)]
+    else:
+        return [f for f in os.listdir(src) if ext in f]

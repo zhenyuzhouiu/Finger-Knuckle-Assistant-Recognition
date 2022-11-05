@@ -36,6 +36,7 @@ from os.path import join
 from models.EfficientNetV2 import efficientnetv2_s, ConvBNAct
 from collections import OrderedDict
 from functools import partial
+from torchvision.ops import roi_align
 
 current_path = os.path.abspath(getsourcefile(lambda: 0))
 current_dir = os.path.dirname(current_path)
@@ -45,19 +46,24 @@ sys.path.insert(0, parent_dir)
 transform = transforms.Compose([transforms.ToTensor()])
 
 
-def calc_feats_more(*paths):
+def calc_feats_more(test_path, assistant_path, usr, size=(208, 184)):
     """
     1.Read a batch of images from the given paths
     2.Normalize image from 0-255 to 0-1
     3.Get a batch of feature from the model inference()
     """
-    size = args.default_size
-    w, h = size[0], size[1]
-    ratio = size[1] / size[0]
-    container = np.zeros((len(paths), 3, h, w))
-    for i, path in enumerate(paths):
+    subject_path = os.path.join(test_path, usr)
+    image_names = os.listdir(subject_path)
+    x = torch.zeros([len(image_names), 3, size[1], size[0]], dtype=torch.float32)
+    s8 = torch.zeros([len(image_names), 320, 22, 26], dtype=torch.float32)
+    s16 = torch.zeros([len(image_names), 640, 12, 14], dtype=torch.float32)
+    s32 = torch.zeros([len(image_names), 1280, 7, 8], dtype=torch.float32)
+    for i, imname in enumerate(image_names):
+        # ========================== read segmented finger knuckle
+        image_path = os.path.join(subject_path, imname)
+        ratio = size[1] / size[0]
         image = np.array(
-            Image.open(path).convert('RGB'),
+            Image.open(image_path).convert('RGB'),
             dtype=np.float32
         )
         image = image[8:-8, :, :]
@@ -76,120 +82,84 @@ def calc_feats_more(*paths):
             crop_image = image[:, crop_w - 1:crop_w + int(dest_w), :]
         else:
             crop_image = image
-
         resize_image = cv2.resize(crop_image, dsize=size)
         # change hxwxc = cxhxw
-        im = np.transpose(resize_image, (2, 0, 1))
-        container[i, :, :, :] = im
-    container /= 255.
-    container = torch.from_numpy(container.astype(np.float32))
-    container = container.cuda()
-    container = Variable(container, requires_grad=False)
-    fv = inference(container)
+        im = torch.from_numpy(np.transpose(resize_image, (2, 0, 1)).astype(np.float32)/255.).unsqueeze(0)
+        x[i, :, :, :] = im
+        # ========================================== read yolov5 feature maps
+        prefix_name = imname.split('.')[0]
+        # =========
+        # feature_8.shape:-> h*w*320
+        feature_8 = np.load(join(assistant_path, usr, prefix_name + '-8.npy'))
+        h = feature_8.shape[0]
+        w = feature_8.shape[1]
+        # h*w*320 -> 320*h*w -> 1*320*h*w
+        feature_8 = torch.from_numpy(np.expand_dims(np.transpose(feature_8, axes=(2, 0, 1)), axis=0)).float()
+        boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
+        pooled_8 = roi_align(feature_8, boxes, [22, 26])
+        s8[i, ...] = pooled_8
+        # ==========
+        # feature_16.shape:-> h*w*640
+        feature_16 = np.load(join(assistant_path, usr, prefix_name + '-16.npy'))
+        h = feature_16.shape[0]
+        w = feature_16.shape[1]
+        # h*w*640 -> 640*h*w -> 1*640*h*w
+        feature_16 = torch.from_numpy(np.expand_dims(np.transpose(feature_16, axes=(2, 0, 1)), axis=0)).float()
+        boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
+        pooled_16 = roi_align(feature_16, boxes, [12, 14])
+        s16[i, ...] = pooled_16
+        # =========
+        # feature_32.shape:-> h*w*1280
+        feature_32 = np.load(join(assistant_path, usr, prefix_name + '-32.npy'))
+        h = feature_32.shape[0]
+        w = feature_32.shape[1]
+        # h*w*1280 -> 1280*h*w -> 1*1280*h*w
+        feature_32 = torch.from_numpy(np.expand_dims(np.transpose(feature_32, axes=(2, 0, 1)), axis=0)).float()
+        boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
+        pooled_32 = roi_align(feature_32, boxes, [7, 8])
+        s32[i, ...] = pooled_32
+
+    x = x.cuda()
+    x = Variable(x, requires_grad=False)
+    s8 = s8.cuda()
+    s8 = Variable(s8, requires_grad=False)
+    s16 = s16.cuda()
+    s16 = Variable(s16, requires_grad=False)
+    s32 = s32.cuda()
+    s32 = Variable(s32, requires_grad=False)
+
+    fv = inference(s8, s16, s32)
     # traced_script_module = torch.jit.trace(inference, container)
     # traced_script_module.save("traced_450.pt")
-
     return fv.cpu().data.numpy()
 
 
-def calc_assistant_feats_more(*paths):
-    """
-    1). load finger knuckle feature maps from yolov5
-    2). for keeping the same feature map size, we use the roi_align
-    """
-    size = args.default_size
-    w, h = size[0], size[1]
-    ratio = size[1] / size[0]
-    container = np.zeros((len(paths), 3, h, w))
-    for i, path in enumerate(paths):
-        image = np.array(
-            Image.open(path).convert('RGB'),
-            dtype=np.float32
-        )
-        image = image[8:-8, :, :]
-        h, w, c = image.shape
-        dest_w = h / ratio
-        dest_h = w * ratio
-        if dest_w > w:
-            crop_h = int((h - dest_h) / 2)
-            if crop_h == 0:
-                crop_h = 1
-            crop_image = image[crop_h - 1:crop_h + int(dest_h), :, :]
-        elif dest_h > h:
-            crop_w = int((w - dest_w) / 2)
-            if crop_w == 0:
-                crop_w = 1
-            crop_image = image[:, crop_w - 1:crop_w + int(dest_w), :]
-        else:
-            crop_image = image
-
-        resize_image = cv2.resize(crop_image, dsize=size)
-        # change hxwxc = cxhxw
-        im = np.transpose(resize_image, (2, 0, 1))
-        container[i, :, :, :] = im
-    container /= 255.
-    container = torch.from_numpy(container.astype(np.float32))
-    container = container.cuda()
-    container = Variable(container, requires_grad=False)
-    fv = inference(container)
-    # traced_script_module = torch.jit.trace(inference, container)
-    # traced_script_module.save("traced_450.pt")
-
-    return fv.cpu().data.numpy()
-
-
-def genuine_imposter(test_path, assistant_path):
-
-    subs = subfolders(test_path, preserve_prefix=True)
-    nsubs = len(subs)
+def genuine_imposter(test_path, assistant_path, image_size):
+    nims = 5  # num_images for one subject
+    subject_names = os.listdir(test_path)
+    nsubs = len(subject_names)
     feats_all = []
-    subimnames = []
-    for i, usr in enumerate(subs):
-        subims = subimages(usr, preserve_prefix=True)
-        subimnames += subims
-        nims = len(subims)
-        feats_all.append(calc_feats_more(*subims))
+    for i, usr in enumerate(subject_names):
+        feats_all.append(calc_feats_more(test_path, assistant_path, usr, image_size))
     feats_all = torch.from_numpy(np.concatenate(feats_all, 0)).cuda()
-
-    assistant_subs = subfolders(assistant_path, preserve_prefix=True)
-    assistant_feats_all = []
-    subfmnames = []
-    for i, usr in enumerate(assistant_subs):
-        subfms = subfeatures(usr, preserve_prefix=True)
-        subfmnames += subfms
-        nfms = len((subfms))
-        assistant_feats_all.append(calc_assistant_feats_more(*subfms))
-    assistant_feats_all = torch.from_numpy(np.concatenate(assistant_feats_all, 0)).cuda()
-
 
     # nsubs-> how many subjects on the test_path
     # nims-> how many images on each of subjects' path
     # for example, for hd(1-4), matching_matrix.shape = (714x4, 714x4)
     matching_matrix = np.ones((nsubs * nims, nsubs * nims)) * 1000000
     for i in range(1, feats_all.size(0)):
-        feat1 = feats_all[:-i, :, :, :]
-        feat2 = feats_all[i:, :, :, :]
-        # loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :])
-        loss = _loss(feat1, feat2)
+        loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :])
         matching_matrix[:-i, i] = loss
         print("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
         # sys.stdout.write("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
         # sys.stdout.flush()
 
-    matt = np.ones_like(matching_matrix) * 1000000
+    matt = np.ones_like(matching_matrix) * 1e5
     matt[0, :] = matching_matrix[0, :]
     for i in range(1, feats_all.size(0)):
-        # matching_matrix每行的数值向后移动一位
         matt[i, i:] = matching_matrix[i, :-i]
         for j in range(i):
-            # matt[i, j] = matt[j, i]
             matt[i, j] = matching_matrix[j, i - j]
-
-    # matt is the matching score of
-    #   1  A1A2 A1A3 A1A4
-    # A2A1  1   A2A3 A2A4
-    # A3A1 A3A2  1   A3A4
-    # A4A1 A4A2 A4A3  1
     print("\n [*] Done")
 
     g_scores = []
@@ -219,24 +189,24 @@ def genuine_imposter(test_path, assistant_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/dataset/THU-FVFDT/FDT3_Train/major/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-index-crop/",
                     dest="test_path")
 parser.add_argument("--assistant_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/dataset/THU-FVFDT/FDT3_Train/major/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-index-feature/",
                     dest="assistant_path")
 parser.add_argument("--out_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/checkpoint/RFNet-TL/fkv3(yolov5)-session2_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-07-18-10-15/output/crossthu-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_AssistantModel-wholeimagerotationandtranslation-lr1e-05-subs8-angle0-a20-hs0_vs0_2022-11-04-22-46/output/index-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/Finger-Knuckle-Assistant-Recognition/checkpoint/RFNet-TL/fkv3(yolov5)-session2_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-07-18-10-15/ckpt_epoch_6000.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_AssistantModel-wholeimagerotationandtranslation-lr1e-05-subs8-angle0-a20-hs0_vs0_2022-11-04-22-46/ckpt_epoch_3000.pth",
                     dest="model_path")
-parser.add_argument("--default_size", type=int, dest="default_size", default=(208, 184))
+parser.add_argument("--default_size", type=int, dest="default_size", default=(208, 176))
 parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
 parser.add_argument('--block_size', type=int, dest="block_size", default=8)
 parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=0)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-parser.add_argument('--model', type=str, dest='model', default="RFNet")
+parser.add_argument('--model', type=str, dest='model', default="AssistantModel")
 
 model_dict = {
     "RFNet": models.net_model.ResidualFeatureNet().cuda(),
@@ -244,6 +214,8 @@ model_dict = {
     "EfficientNetV2-S": models.EfficientNetV2.efficientnetv2_s().cuda(),
     "RFNWithSTNet": models.net_model.RFNWithSTNet().cuda(),
     "ConvNet": models.net_model.ConvNet().cuda(),
+    "FusionModel": models.net_model.FusionModel().cuda(),
+    "AssistantModel": models.net_model.AssistantModel().cuda(),
 }
 
 args = parser.parse_args()
@@ -294,7 +266,7 @@ def _loss(feats1, feats2):
 inference = inference.cuda()
 inference.eval()
 
-gscores, iscores, mmat = genuine_imposter(args.test_path, args.assistant_path)
+gscores, iscores, mmat = genuine_imposter(args.test_path, args.assistant_path, args.default_size)
 if args.save_mmat:
     np.save(args.out_path, {"g_scores": gscores, "i_scores": iscores, "mmat": mmat})
 else:

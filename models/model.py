@@ -202,7 +202,7 @@ class Model(object):
             start_epoch = 1
 
         # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
-        scheduler = MultiStepLR(self.optimizer, milestones=[10, 500, 1000], gamma=0.1)
+        scheduler = MultiStepLR(self.optimizer, milestones=[10, 1000, 1500], gamma=0.1)
 
         for e in range(start_epoch, args.epochs + start_epoch):
             # self.exp_lr_scheduler(e, lr_decay_epoch=100)

@@ -55,9 +55,9 @@ def calc_feats_more(test_path, assistant_path, usr, size=(208, 184)):
     subject_path = os.path.join(test_path, usr)
     image_names = os.listdir(subject_path)
     x = torch.zeros([len(image_names), 3, size[1], size[0]], dtype=torch.float32)
-    s8 = torch.zeros([len(image_names), 320, 32, 32], dtype=torch.float32)
-    s16 = torch.zeros([len(image_names), 640, 16, 16], dtype=torch.float32)
-    s32 = torch.zeros([len(image_names), 1280, 8, 8], dtype=torch.float32)
+    s8 = torch.zeros([len(image_names), 320, 22, 26], dtype=torch.float32)
+    s16 = torch.zeros([len(image_names), 640, 12, 14], dtype=torch.float32)
+    s32 = torch.zeros([len(image_names), 1280, 7, 8], dtype=torch.float32)
     for i, imname in enumerate(image_names):
         # ========================== read segmented finger knuckle
         image_path = os.path.join(subject_path, imname)
@@ -96,7 +96,7 @@ def calc_feats_more(test_path, assistant_path, usr, size=(208, 184)):
         # h*w*320 -> 320*h*w -> 1*320*h*w
         feature_8 = torch.from_numpy(np.expand_dims(np.transpose(feature_8, axes=(2, 0, 1)), axis=0)).float()
         boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-        pooled_8 = roi_align(feature_8, boxes, [32, 32])
+        pooled_8 = roi_align(feature_8, boxes, [22, 26])
         s8[i, ...] = pooled_8
         # ==========
         # feature_16.shape:-> h*w*640
@@ -106,7 +106,7 @@ def calc_feats_more(test_path, assistant_path, usr, size=(208, 184)):
         # h*w*640 -> 640*h*w -> 1*640*h*w
         feature_16 = torch.from_numpy(np.expand_dims(np.transpose(feature_16, axes=(2, 0, 1)), axis=0)).float()
         boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-        pooled_16 = roi_align(feature_16, boxes, [16, 16])
+        pooled_16 = roi_align(feature_16, boxes, [12, 14])
         s16[i, ...] = pooled_16
         # =========
         # feature_32.shape:-> h*w*1280
@@ -116,7 +116,7 @@ def calc_feats_more(test_path, assistant_path, usr, size=(208, 184)):
         # h*w*1280 -> 1280*h*w -> 1*1280*h*w
         feature_32 = torch.from_numpy(np.expand_dims(np.transpose(feature_32, axes=(2, 0, 1)), axis=0)).float()
         boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-        pooled_32 = roi_align(feature_32, boxes, [8, 8])
+        pooled_32 = roi_align(feature_32, boxes, [7, 8])
         s32[i, ...] = pooled_32
 
     x = x.cuda()
@@ -196,12 +196,12 @@ parser.add_argument("--assistant_path", type=str,
                     default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-index-feature/",
                     dest="assistant_path")
 parser.add_argument("--out_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_FusionNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-11-04-00-02/output/index-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_FusionNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-11-04-22-00/output/index-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_FusionNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-11-04-00-02/ckpt_epoch_3000.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_FusionNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-11-04-22-00/ckpt_epoch_2860.pth",
                     dest="model_path")
-parser.add_argument("--default_size", type=int, dest="default_size", default=(208, 184))
+parser.add_argument("--default_size", type=int, dest="default_size", default=(208, 176))
 parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
 parser.add_argument('--block_size', type=int, dest="block_size", default=8)
 parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=0)

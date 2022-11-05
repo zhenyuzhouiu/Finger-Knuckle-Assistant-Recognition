@@ -12,9 +12,9 @@ import argparse
 from plotroc_basic import *
 
 
-src_npy = ['/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/leave-one-out/index-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/leave-one-out/ring-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/leave-one-out/little-protocol.npy',
+src_npy = ['/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_AssistantModel-wholeimagerotationandtranslation-lr1e-05-subs8-angle0-a20-hs0_vs0_2022-11-04-22-46/output/leave-one-out/index-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_AssistantModel-wholeimagerotationandtranslation-lr1e-05-subs8-angle0-a20-hs0_vs0_2022-11-04-22-46/output/leave-one-out/ring-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_AssistantModel-wholeimagerotationandtranslation-lr1e-05-subs8-angle0-a20-hs0_vs0_2022-11-04-22-46/output/leave-one-out/little-protocol.npy',
            '/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/matching_matrix/left_index_matching_matrix.npy',
            '/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/codekevin/fknet/test/rfn-tl/fkv3-two-session-protocol.npy',
            '/home/zhenyuzhou/Desktop/finger-knuckle/deep-learning/codekevin/fknet/test/rfn-tl/hd-protocol.npy',
@@ -47,7 +47,7 @@ color = ['#ff0000',
          '#808000',
          '#ff00ff',
          '#ff0000']
-dst = '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/leave-one-out/roc.pdf'
+dst = '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_AssistantModel-wholeimagerotationandtranslation-lr1e-05-subs8-angle0-a20-hs0_vs0_2022-11-04-22-46/output/leave-one-out/roc.pdf'
 
 for i in range(3):
     data = np.load(src_npy[i], allow_pickle=True)[()]

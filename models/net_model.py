@@ -213,29 +213,32 @@ class AssistantModel(torch.nn.Module):
         super(AssistantModel, self).__init__()
         # ======================================== reduce dimension
         self.reduce1 = nn.Conv2d(in_channels=1280, out_channels=640, kernel_size=1)
+        self.reduce1bn = nn.BatchNorm2d(num_features=640)
         self.reduce2 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=1)
+        self.reduce2bn = nn.BatchNorm2d(num_features=320)
         self.reduce3 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=1)
+        self.reduce3bn = nn.BatchNorm2d(128)
 
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
         self.conv1 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=3)
         self.bn1 = nn.BatchNorm2d(num_features=320)
         self.conv2 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=3)
         self.bn2 = nn.BatchNorm2d(num_features=128)
-        self.conv3 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3)
-        self.bn3 = nn.BatchNorm2d(num_features=64)
-        self.resid1 = ResidualBlock(64)
-        self.resid2 = ResidualBlock(64)
-        self.conv4 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3)
-        self.bn4 = nn.BatchNorm2d(num_features=32)
-        self.conv5 = nn.Conv2d(in_channels=32, out_channels=1, kernel_size=3)
+        self.conv3 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3)
+        self.bn3 = nn.BatchNorm2d(num_features=128)
+        self.resid1 = ResidualBlock(128)
+        self.resid2 = ResidualBlock(128)
+        self.conv4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3)
+        self.bn4 = nn.BatchNorm2d(num_features=64)
+        self.conv5 = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=3)
 
     def forward(self, x8, x16, x32):
         # x8.shape():-> [b, 320, 22, 26]
         # x16.shape():-> [b, 640, 12, 14]
         # x32.shape():-> [b, 1280, 7, 8]
-        x32 = F.sigmoid(self.reduce1(x32))
-        x16 = F.sigmoid(self.reduce2(x16))
-        x8 = F.sigmoid(self.reduce3(x8))
+        x32 = F.sigmoid(self.reduce1bn(self.reduce1(x32)))
+        x16 = F.sigmoid(self.reduce2bn(self.reduce2(x16)))
+        x8 = F.sigmoid(self.reduce3bn(self.reduce3(x8)))
 
         x32 = self.upsample(x32)
         x32 = F.relu(self.bn1(self.conv1(x32)))
@@ -261,8 +264,11 @@ class FusionModel(torch.nn.Module):
         super(FusionModel, self).__init__()
         # fuse yolov5 features
         self.reduce1 = nn.Conv2d(in_channels=1280, out_channels=640, kernel_size=1)
+        self.reduce1bn = nn.BatchNorm2d(num_features=640)
         self.reduce2 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=1)
-        self.reduce3 = nn.Conv2d(in_channels=320, out_channels=160, kernel_size=1)
+        self.reduce2bn = nn.BatchNorm2d(num_features=320)
+        self.reduce3 = nn.Conv2d(in_channels=320, out_channels=128, kernel_size=1)
+        self.reduce3bn = nn.BatchNorm2d(num_features=128)
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear')
         self.conv1 = nn.Conv2d(in_channels=640, out_channels=320, kernel_size=3)
         self.bn1 = nn.BatchNorm2d(num_features=320)
@@ -274,6 +280,8 @@ class FusionModel(torch.nn.Module):
         # extract finger knuckle features
         self.fknet = ResidualFeatureNet_Nohead()
 
+        self.middle = nn.Conv2d(in_channels=192, out_channels=128, kernel_size=3, padding=1)
+        self.middlebn = nn.BatchNorm2d(num_features=128)
         # fuse feature maps by add
         self.resid1 = ResidualBlock(128)
         self.resid2 = ResidualBlock(128)
@@ -281,13 +289,13 @@ class FusionModel(torch.nn.Module):
         self.bn4 = nn.BatchNorm2d(num_features=64)
         self.conv5 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3)
         self.bn5 = nn.BatchNorm2d(num_features=32)
-        self.conv6 = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=3)
+        self.conv6 = nn.Conv2d(in_channels=32, out_channels=1, kernel_size=3)
 
     def forward(self, x, s8, s16, s32):
         # fuse yolov5 features output [b, 64, 22, 26]
-        s32 = F.sigmoid(self.reduce1(s32))
-        s16 = F.sigmoid(self.reduce2(s16))
-        s8 = F.sigmoid(self.reduce3(s8))
+        s32 = F.sigmoid(self.reduce1bn(self.reduce1(s32)))
+        s16 = F.sigmoid(self.reduce2bn(self.reduce2(s16)))
+        s8 = F.sigmoid(self.reduce3bn(self.reduce3(s8)))
         s32 = self.upsample(s32)
         s32 = F.relu(self.bn1(self.conv1(s32)))
         s16 = s32 + s16
@@ -303,8 +311,10 @@ class FusionModel(torch.nn.Module):
 
         # fuse feature maps by concat
         # [b, 256, 32, 32]
-        # out = torch.cat([x, s8], dim=1)
-        out = x + self.upsample(s8)
+        s8 = self.upsample(s8)
+        out = torch.cat([x, s8], dim=1)
+        out = F.relu(self.middlebn(self.middle(out)))
+        # out = x + self.upsample(s8)
         out = self.resid1(out)
         out = self.resid2(out)
         out = F.relu(self.bn4(self.conv4(out)))

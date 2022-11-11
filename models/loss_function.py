@@ -257,8 +257,10 @@ class HammingDistance(torch.nn.Module):
         return hamming_distance
 
 
-class AttentionScore(torch.nn.Module):
+class ConvolutionScore(torch.nn.Module):
     """
+    Split one of feature maps from [bs, 1, 32, 32] to [bs, 16, 8, 8] as the convolution kernel to
+    convolve the other [bs, 1, 32, 32], then output [bs, 16, 32, 32] as the attention matching score.
     1:-> input feature maps' shape is [bs, 1, 32, 32]
     2:-> split feature maps to 8x8 sub-images,
     3:-> one sub-image compare to the another feature maps to calculate the similarity
@@ -268,7 +270,7 @@ class AttentionScore(torch.nn.Module):
     """
 
     def __init__(self, i_subsize=8):
-        super(AttentionScore, self).__init__()
+        super(ConvolutionScore, self).__init__()
         self.subsize = i_subsize
         self.reflection_pad = torch.nn.ReflectionPad2d(3)
 
@@ -406,13 +408,13 @@ if __name__ == "__main__":
     loss = "AttentionScore"
     if loss == "AttentionScore":
         if mode == "eval":
-            loss = AttentionScore().eval()
+            loss = ConvolutionScore().eval()
             input1 = torch.randn([5, 5], dtype=torch.double, requires_grad=False).unsqueeze(0).unsqueeze(0)
             input2 = torch.randn([5, 5], dtype=torch.double, requires_grad=False).unsqueeze(0).unsqueeze(0)
             min_dist = loss(input1, input2)
             print(min_dist)
         else:
-            loss = AttentionScore().train()
+            loss = ConvolutionScore().train()
             input1 = torch.randn([32, 32], dtype=torch.double, requires_grad=True).unsqueeze(0).unsqueeze(0).repeat(2,
                                                                                                                     1,
                                                                                                                     1,

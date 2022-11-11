@@ -10,6 +10,8 @@
 #         I-Scores: Subjects * (Subject-1) * (Samples * Samples)
 # =========================================================
 import os
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import sys
 from PIL import Image
 import numpy as np
@@ -44,10 +46,11 @@ def calc_feats_more(*paths, size=(208, 184)):
     container = np.zeros((len(paths), 3, h, w))
     for i, path in enumerate(paths):
         image = np.array(
-            Image.open(path).convert('RGB').resize(size=size),
+            Image.open(path).convert('RGB'),
             dtype=np.float32
         )
-        image = image[8:-8, :, :]
+        image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        image = image[10:-10, :, :]
         h, w, c = image.shape
         dest_w = h / ratio
         dest_h = w * ratio
@@ -127,10 +130,10 @@ def genuine_imposter(test_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/left-yolov5s-crop-feature-detection/left-little-crop/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/right-yolov5x-csl/right-index/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/little-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/right-index-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
                     default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/ckpt_epoch_2020.pth",

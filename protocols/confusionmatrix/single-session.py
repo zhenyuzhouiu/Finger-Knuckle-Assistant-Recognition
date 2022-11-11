@@ -55,7 +55,7 @@ def calc_feats(path):
     w, h = size[0], size[1]
     container = np.zeros((1, 3, h, w))
     im = np.array(
-        Image.open(path).convert("RGB").resize(size=size),
+        Image.open(path).convert("RGB"),
         dtype=np.float32
     )
     container[0, 0, :, :] = im

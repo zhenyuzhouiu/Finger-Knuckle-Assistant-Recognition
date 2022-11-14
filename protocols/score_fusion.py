@@ -1,351 +1,140 @@
 import os
 import pandas as pd
 import numpy as np
-
-import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
-import matplotlib.pylab as pylab
+from plot.plotroc_basic import *
+import matplotlib
 
-from collections import defaultdict
-from tqdm import tqdm
-from sklearn.metrics import roc_curve, roc_auc_score
-from itertools import cycle
+label = ['Finger-Knuckle',
+         'Fingerprint',
+         'Score-Fusion']
 
-pylab.rcParams['figure.figsize'] = 20, 12
+color = ['#ff0000',
+         '#000000',
+         "#c0c0c0"]
 
-database_info = {'NumOfSubjects': 120, 'NumOfClasses': 10, 'NumOfSamplePerClass': 5}
-NumOfSubjects = database_info['NumOfSubjects']
-NumOfClasses = database_info['NumOfClasses']
-NumOfSamplePerClass = database_info['NumOfSamplePerClass']
-NumOfGen = (NumOfSubjects * NumOfSamplePerClass * (NumOfSamplePerClass - 1) / 2)
-NumOfImp = (NumOfSamplePerClass ** 2 * NumOfSubjects * (NumOfSubjects - 1) / 2)
-print(NumOfGen, NumOfImp)
+cls = ["01", "02", "03", "07", "08", "09"]
 
+fk_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/score/fk_score/"
+fp_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/score/fp_score/"
+dynamic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/score/dynamic/"
+holistic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/score/holistic/"
+nonlinear_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/score/nonlinear-y2-c1/"
 
-knuckle_img_dir = '/media/administrator/Data/PythonDir/maskrcnn-benchmark/datasets/knuckle/knuckle_seg_96/'
-fp_img_dir = '/media/administrator/Data/data/FingerprintDatabase/'
+def get_score(matching_matrix):
+    feats_length = []
+    nfeats = 0
+    for i in range(120):
+        nfeats += 5
+        feats_length.append(5)
+    feats_length = np.array(feats_length)
+    acc_len = np.cumsum(feats_length)
+    feats_start = acc_len - feats_length
 
-knuckle_des_score_dir = './knuckle_des_score/'
-fp_des_score_dir = './fp_des_score/'
-dynamic_score_dir = './dynamic_fusion_score/'
-static_score_dir = './static_fusion_score/'
-min_score_dir = './min_fusion_score/'
-tanh_score_dir = './tanh_fusion_score/'
-product_score_dir = './product_fusion_score/'
+    g_scores = []
+    i_scores = []
+    # nfeats: number of features
+    for i in range(nfeats):
+        # in case of multiple occurrences of the maximum values,
+        # the indices corresponding to the first occurrence are returned.
+        subj_idx = np.argmax(acc_len > i)
+        g_select = [feats_start[subj_idx] + k for k in range(feats_length[subj_idx])]
+        for i_i in range(i + 1):
+            if i_i in g_select:
+                g_select.remove(i_i)
+        i_select = list(range(nfeats))
+        # remove g_select
+        for subj_i in range(subj_idx + 1):
+            for k in range(feats_length[subj_i]):
+                i_select.remove(feats_start[subj_i] + k)
+        if len(g_select) != 0:
+            g_scores += list(matching_matrix[i, g_select])
+        if len(i_select) != 0:
+            i_scores += list(matching_matrix[i, i_select])
+    return g_scores, i_scores
 
+def draw_roc(scores, save_path):
+    for i in range(len(scores)):
+        score = scores[i]
+        g_scores = np.array(score[0])
+        i_scores = np.array(score[1])
 
-img_info = {'knuckle': knuckle_img_dir, 'fp': fp_img_dir}
-score_info = {'knuckle_des_score_dir': knuckle_des_score_dir,
-              'fp_des_score_dir': fp_des_score_dir}
-fusion_info = {'knuckle': knuckle_des_score_dir,
-               'fingerprint': fp_des_score_dir,
-               'dynamic_fusion': dynamic_score_dir,
-               'static_fusion': static_score_dir,
-               'min_fusion': min_score_dir,
-               'tanh_fusion': tanh_score_dir,
-               'product_fusion': product_score_dir}
+        x, y = calc_coordinates(g_scores, i_scores)
+        print("[*] EER: {}".format(calc_eer(x, y)))
+        EER = "%.3f%%" % (calc_eer(x, y) * 100)
 
+        lines = plt.plot(x, y, label='ROC')
+        plt.setp(lines, 'color', color[i], 'linewidth', 3, 'label', label[i] + "; EER: " + str(EER))
 
-# compute fusion of dynamic, static
-class ScoreFusion:
-    def __init__(self, img_info, score_info):
-        for key, value in img_info.items():
-            setattr(self, key, value)
-        for key, value in score_info.items():
-            setattr(self, key, value)
-        self.biometrics = [key for key in img_info.keys()]
-        self.files = self.get_files()
-        self.fp_namechange()
-        self.file_class = self.build_file_class()
-        self.n_class = self.get_numofclasses()
-        self.classes = self.get_classes()
+        matplotlib.rc('xtick', labelsize=10)
+        matplotlib.rc('ytick', labelsize=10)
 
-    def get_file_bybiometric(self, biometric):
-        files = []
-        img_dir = getattr(self, biometric)
-        for (dirpath, dirnames, filenames) in os.walk(img_dir):
-            for filename in filenames:
-                files.append(filename[:-4])
-        files.sort()
-        return files
+        plt.grid(True)
+        plt.xlabel(r'False Accept Rate', fontsize=18)
+        plt.ylabel(r'Genuine Accept Rate', fontsize=18)
+        legend = plt.legend(loc='lower right', shadow=False, prop={'size': 16})
+        plt.xlim(xmin=np.min(x))
+        plt.xlim(xmax=0)
+        plt.ylim(ymax=1)
+        plt.ylim(ymin=0.4)
 
-    def get_files(self):
-        files = defaultdict(list)
-        for biometric in self.biometrics:
-            files[biometric] = self.get_file_bybiometric(biometric)
-        return files
+        ax = plt.gca()
+        ax.spines['bottom'].set_color('black')
+        ax.spines['top'].set_color('black')
+        ax.spines['left'].set_color('black')
+        ax.spines['right'].set_color('black')
 
-    def build_file_class(self):
-        files = defaultdict(list)
-        for biometric in self.biometrics:
-            file_class = defaultdict(list)
-            for filename in self.files[biometric]:
-                _, clas, _ = filename.split('-')
-                file_class[clas].append(filename)
-            files[biometric] = file_class
-        return files
+        for axis in ['top', 'bottom', 'left', 'right']:
+            ax.spines[axis].set_linewidth(2.0)
 
-    def fp_namechange(self):
-        new_name = []
-        for filename in self.files['fp']:
-            subject_id, _, clas, instance = filename.split('-')
-            name = '-'.join((subject_id, clas, instance))
-            new_name.append(name)
-        self.files['fp'] = new_name
+        plt.xticks(np.array([-4, -2, 0]), ['$10^{-4}$', '$10^{-2}$', '$10^{0}$'], fontsize=16)
+        plt.yticks(np.array([0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]), fontsize=16)
 
-    def get_numofclasses(self):
-        n_class = dict()
-        for biometric in self.biometrics:
-            n_class[biometric] = len(self.file_class[biometric])
+    plt.savefig(save_path, bbox_inches='tight')
+    plt.close()
 
-        value_ls = []
-        for value in n_class.values():
-            value_ls.append(value)
-        if len(set(value_ls)) == 1:
-            return value_ls[0]
+for c in cls:
+    fk_score_file = os.path.join(fk_score_path, "fk_score_"+c+".npy")
+    fp_score_file = os.path.join(fp_score_path, "fp_score_"+c+".csv")
+    dynamic_save_file = os.path.join(dynamic_save_path, c+".pdf")
+    holistic_save_file = os.path.join(holistic_save_path, c+".pdf")
+    nonlinear_save_file = os.path.join(nonlinear_save_path, c+'.pdf')
 
-    def get_classes(self):
-        classes = []
-        for key in self.file_class['fp'].keys():
-            classes.append(key)
-        return classes
+    fk_score = np.load(fk_score_file, allow_pickle=True)[()]
+    fk_matrix = np.array(fk_score['mmat'])
+    g_scores = np.array(fk_score["g_scores"])
+    g_min = np.min(g_scores)
+    g_max = np.max(g_scores)
+    i_scores = np.array(fk_score['i_scores'])
+    i_min = np.min(i_scores)
+    i_max = np.max(i_scores)
+    # normalize score
+    max = np.max(np.array([g_max, i_max]))
+    min = np.min(np.array([g_min, g_min]))
+    fk_matrix = (fk_matrix - min) / (max - min)
 
-    def save_fusion_score(self, fusion_rule):
-        for clas in self.classes:
-            #             clas = '01'
-            #             if clas == '05' or clas == '06':
-            set_k = set(self.file_class['knuckle'][clas])
-            set_f = set(self.file_class['fp'][clas])
+    fp_score = pd.read_csv(fp_score_file, header=None)
+    fp_score = fp_score.drop(columns=0).drop([0])
+    fp_matrix = fp_score.values.tolist()
+    fp_matrix = np.array(fp_matrix).astype(np.float)
 
-            common = set_k & set_f
-            dif1 = set_k - set_f
-            dif2 = set_f - set_k
-            union = set_k | set_f
+    fk_g_scores, fk_i_scores = get_score(fk_matrix)
+    fp_g_scores, fp_i_scores = get_score(fp_matrix)
 
-            kf_list = list(union)
-            kf_list.sort()
+    # dynamic_matrix = 0.5*fk_matrix + 0.5*fp_matrix
+    # dynamic_g, dynamic_i = get_score(dynamic_matrix)
+    # draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [dynamic_g, dynamic_i]],
+    #          save_path=dynamic_save_file)
+    #
+    # holistic_matrix = (0.5*fk_matrix + 0.5*fp_matrix) * (1 + 1 / (2 - fk_matrix))
+    # holistic_g, holistic_i = get_score(holistic_matrix)
+    # draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [holistic_g, holistic_i]],
+    #          save_path=holistic_save_file)
 
-            fs_df = pd.DataFrame(index=kf_list, columns=kf_list)
-            fs_df.fillna(-1, inplace=True)
-
-            fp_df_name = ''.join(('_'.join(('fp', 'score', clas)), '.csv'))
-            fp_df = pd.read_csv(os.path.join(self.fp_des_score_dir, fp_df_name), header=0, index_col=0)
-
-            knuckle_df_name = ''.join(('_'.join(('knuckle', 'score', clas)), '.csv'))
-            knuckle_df = pd.read_csv(os.path.join(self.knuckle_des_score_dir, knuckle_df_name), header=0, index_col=0)
-
-            w_fp, w_kn = 0.5, 0.5
-            for i, row in enumerate(tqdm(kf_list)):
-                if (row in fp_df.index) and (row in knuckle_df.index):
-                    for j, col in enumerate(kf_list[i + 1:]):
-                        if (col in fp_df.columns) and (col in knuckle_df.columns):
-                            if fusion_rule == 'static':
-                                fs_df.loc[row, col] = w_fp * fp_df.loc[row, col] + w_kn * knuckle_df.loc[row, col]
-                            elif fusion_rule == 'min':
-                                fs_df.loc[row, col] = min(fp_df.loc[row, col], knuckle_df.loc[row, col])
-                            elif fusion_rule == 'product':
-                                fs_df.loc[row, col] = fp_df.loc[row, col] * knuckle_df.loc[row, col]
-                        #                             fs_df.loc[row, col] = w_fp * fp_df.loc[row, col] + w_kn * knuckle_df.loc[row, col]
-                        elif (col not in fp_df.columns) and (col in knuckle_df.columns):
-                            fs_df.loc[row, col] = knuckle_df.loc[row, col]
-                        elif (col in fp_df.columns) and (col not in knuckle_df.columns):
-                            fs_df.loc[row, col] = fp_df.loc[row, col]
-                elif row not in fp_df.index:
-                    for j, col in enumerate(kf_list[i + 1:]):
-                        if col in knuckle_df.columns:
-                            fp_df.loc[row, col] = 1
-                            if fusion_rule == 'static':
-                                fs_df.loc[row, col] = w_fp * fp_df.loc[row, col] + w_kn * knuckle_df.loc[row, col]
-                            elif fusion_rule == 'min':
-                                fs_df.loc[row, col] = min(fp_df.loc[row, col], knuckle_df.loc[row, col])
-                            elif fusion_rule == 'product':
-                                fs_df.loc[row, col] = fp_df.loc[row, col] * knuckle_df.loc[row, col]
-                else:
-                    for j, col in enumerate(kf_list[i + 1:]):
-                        if col in fp_df.columns:
-                            knuckle_df.loc[row, col] = 1
-                            if fusion_rule == 'static':
-                                fs_df.loc[row, col] = w_fp * fp_df.loc[row, col] + w_kn * knuckle_df.loc[row, col]
-                            elif fusion_rule == 'min':
-                                fs_df.loc[row, col] = min(fp_df.loc[row, col], knuckle_df.loc[row, col])
-                            elif fusion_rule == 'product':
-                                fs_df.loc[row, col] = fp_df.loc[row, col] * knuckle_df.loc[row, col]
-
-            des_name = ''.join(('_'.join(('fusion', 'score', clas)), '.csv'))
-            score_dir = '_'.join((fusion_rule, 'fusion', 'score'))
-            fs_df.to_csv(os.path.join(score_dir, des_name))
-
-            fs_2d = fs_df.to_numpy()
-            upper_mask = np.triu_indices(fs_2d.shape[0], 1)
-            lower_mask = np.tril_indices(fs_2d.shape[0], 0)
-            fs_upper = fs_2d[upper_mask]
-            fs_lower = fs_2d[lower_mask]
-            assert (fs_lower == -1).all()
-
-            assert (fs_2d.shape[0] ** 2 - fs_2d.shape[0]) / 2 == fs_upper.shape[0]
+    nonlinear_matrix = np.power((1 + fp_matrix)/(1+fk_matrix), 2) * np.power((1+fk_matrix), 2)
+    nonlinear_g, nonlinear_i = get_score(nonlinear_matrix)
+    draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [nonlinear_g, nonlinear_i]],
+             save_path=nonlinear_save_file)
 
 
-#             break
 
-sf = ScoreFusion(img_info, score_info)
-
-# run this part only once
-fusion_rules = ['static', 'min', 'product']
-for fusion_rule in fusion_rules:
-    print('Fusion Rule:', fusion_rule)
-    sf.save_fusion_score(fusion_rule)
-
-
-class CSV2ROC:
-    def __init__(self, src_csv_dir):
-        self.src_csv_dir = src_csv_dir
-        self.filenamelist = self.get_all_files()
-        self.classes = self.get_classes()
-        self.n_classes = len(self.classes)
-        self.y, self.scores, self.n_g, self.n_i = self.get_score()
-        self.fpr, self.tpr, self.eer, self.roc_auc = self.compute_roc()
-
-    def get_all_files(self):
-        filenamelist = os.listdir(self.src_csv_dir)
-        filenamelist.sort()
-        return filenamelist
-
-    def get_classes(self):
-        classes = []
-        for filename in self.filenamelist:
-            _, _, finger_type = filename[:-4].split('_')
-            classes.append(finger_type)
-        return classes
-
-    def get_score(self):
-        y = dict()
-        scores = dict()
-        num_g = dict()
-        num_i = dict()
-        for index, finger_type in zip(range(self.n_classes), self.classes):
-            #             index = 0
-            #             finger_type = '01'
-            csv_path = os.path.join(self.src_csv_dir, self.filenamelist[index])
-            df = pd.read_csv(csv_path, header=0)
-
-            # g_s: genuine score
-            # i_s: impostor score
-            g_s = []
-            i_s = []
-            n_g, n_i = 0, 0
-
-            for row in df.index:
-                can_subject_id, can_finger_id, can_instance = df.iloc[row, 0].split('-')
-                for col in range(row + 1, len(df.columns)):
-                    if df.iloc[row, col] >= 0:
-                        ref_subject_id, ref_finger_id, ref_instance = df.columns[col].split('-')
-                        if (can_subject_id == ref_subject_id) and (can_finger_id == ref_finger_id):
-                            if (can_instance != ref_instance):
-                                #                 print("genuine")
-                                n_g += 1
-                                g_s.append(df.iloc[row, col])
-                        else:
-                            #             print("impostor")
-                            n_i += 1
-                            i_s.append(df.iloc[row, col])
-
-            # print(n_g, n_i)
-            num_g[finger_type] = n_g
-            num_i[finger_type] = n_i
-
-            g_s = np.array(g_s)
-            i_s = np.array(i_s)
-            g_s.sort()
-            i_s.sort()
-
-            min_all, max_all = min(g_s.min(), i_s.min()), max(g_s.max(), i_s.max())
-
-            g_s_norm = (g_s - min_all) / (max_all - min_all)
-            i_s_norm = (i_s - min_all) / (max_all - min_all)
-
-            # check
-            if n_g < NumOfGen:
-                one = np.ones(int(NumOfGen) - n_g)
-                g_s_norm = np.append(g_s_norm, one)
-
-            if n_i < NumOfImp:
-                one = np.ones(int(NumOfImp) - n_i)
-                i_s_norm = np.append(i_s_norm, one)
-
-            #             y1 , y0 = np.ones(n_g), np.zeros(n_i)
-            y1, y0 = np.ones(int(NumOfGen)), np.zeros(int(NumOfImp))
-
-            assert len(g_s_norm) == len(y1)
-            assert len(i_s_norm) == len(y0)
-            y[finger_type] = np.concatenate((y1, y0), axis=0)
-            scores[finger_type] = np.concatenate((g_s_norm, i_s_norm), axis=0)
-        #             break
-
-        return y, scores, num_g, num_i
-
-    def compute_roc(self):
-        fpr = dict()
-        tpr = dict()
-        roc_auc = dict()
-        eer = dict()
-
-        for finger_type in self.classes:
-            #             finger_type = '01'
-            fpr[finger_type], tpr[finger_type], threshold = roc_curve(self.y[finger_type], 1 - self.scores[finger_type],
-                                                                      pos_label=1)
-            fnr = 1 - tpr[finger_type]
-            eer_threshold = threshold[np.nanargmin(np.absolute(fnr - fpr[finger_type]))]
-            eer[finger_type] = np.mean([fpr[finger_type][np.nanargmin(np.absolute((fnr - fpr[finger_type])))],
-                                        fnr[np.nanargmin(np.absolute((fnr - fpr[finger_type])))]])
-            roc_auc[finger_type] = roc_auc_score(self.y[finger_type], self.scores[finger_type])
-        #             break
-
-        return fpr, tpr, eer, roc_auc
-
-# biometrics = ['knuckle', 'fingerprint', 'dynamic_fusion', 'static_fusion', 'min_fusion', 'product_fusion']
-biometrics = ['dynamic_fusion', 'static_fusion', 'min_fusion', 'product_fusion', 'tanh_fusion']
-csv2roc = dict()
-for biometric in tqdm(biometrics):
-    print(biometric)
-    csv2roc[biometric] = CSV2ROC(fusion_info[biometric])
-classes = csv2roc[biometric].classes
-
-labels = dict()
-labels['knuckle'] = 'Finger-Knuckle'
-labels['fingerprint'] = 'Fingerprint'
-labels['dynamic_fusion'] = 'Dynamic Fusion'
-labels['static_fusion'] = 'Static (Sum)'
-labels['min_fusion'] = 'Static (Product)'
-labels['product_fusion'] = 'Static (Min)'
-
-finger_type = '01'
-labels = dict()
-labels['knuckle'] = 'Finger-Knuckle'
-labels['fingerprint'] = 'Fingerprint'
-labels['dynamic_fusion'] = 'Combined'
-
-biometrics = ['knuckle', 'fingerprint', 'dynamic_fusion']
-colors = cycle(['black', 'red', 'darkblue'])
-linestyles = cycle(['-', '--', '-.', ':'])
-plt.figure()
-lw = 4
-
-for biometric, color, linestyle in zip(biometrics, colors, linestyles):
-    plt.plot(csv2roc[biometric].fpr[finger_type], csv2roc[biometric].tpr[finger_type], lw=lw,
-             label='{0} (EER = {1:0.5f})'.format(labels[biometric], csv2roc[biometric].eer[finger_type]),
-             color=color, linestyle=linestyle)
-plt.xticks(fontsize=25, fontweight='bold')
-plt.yticks(np.arange(0.7, 1.01, 0.05), fontsize=25, fontweight='bold')
-plt.xlim([1e-4, 1.0])
-plt.xscale('log')
-plt.ylim([0.7, 1.0])
-plt.xlabel('FAR', fontsize=25, fontweight='bold')
-plt.ylabel('GAR', fontsize=25, fontweight='bold')
-# plt.title('Comparative ROC of Finger-Knuckle, Fingerprint and Dynamic Fusion of Finger' + finger_type, fontsize=25, fontweight='bold')
-plt.title('Comparative ROC of Fingerprint and Finger-Knuckle', fontsize=25, fontweight='bold')
-plt.legend(loc="lower right", prop={'size': 30, 'weight': 'bold'})
-plt.grid(linestyle='--')
-# plt.savefig("ROC_fp_kn_dynamic_finger_" + finger_type + ".png")
-plt.savefig("ROC_fp_kn_dynamic_finger_" + finger_type + ".svg", dpi=150)
-plt.savefig("ROC_fp_kn_dynamic_finger_" + finger_type + ".tiff")
-plt.show()

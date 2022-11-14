@@ -7,7 +7,7 @@
 #                   could be helpful for plot CMC
 # @ Note: G-Scores: Subjects * (Samples * (Samples-1)) / 2
 #                   or Subjects * (Samples * Samples)
-#         I-Scores: Subjects * (Subject-1) * (Samples * Samples)
+#         I-Scores: Subjects * (Subject-1) * (Samples * Samples) / 2
 # =========================================================
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -103,39 +103,46 @@ def genuine_imposter(test_path):
         loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :])
         matching_matrix[:-i, i] = loss
         print("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
-        # sys.stdout.write("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
-        # sys.stdout.flush()
 
-    mmat = np.ones_like(matching_matrix) * 1e5
-    mmat[0, :] = matching_matrix[0, :]
+    matt = np.ones_like(matching_matrix) * 1e5
+    matt[0, :] = matching_matrix[0, :]
     for i in range(1, feats_all.size(0)):
-        mmat[i, i:] = matching_matrix[i, :-i]
-        for j in range(i):
-            mmat[i, j] = matching_matrix[j, i - j]
+        matt[i, i:] = matching_matrix[i, :-i]
+        # for j in range(i):
+        #     matt[i, j] = matching_matrix[j, i - j]
     print("\n [*] Done")
 
     g_scores = []
     i_scores = []
+    # nfeats: number of features
     for i in range(nfeats):
+        # in case of multiple occurrences of the maximum values,
+        # the indices corresponding to the first occurrence are returned.
         subj_idx = np.argmax(acc_len > i)
         g_select = [feats_start[subj_idx] + k for k in range(feats_length[subj_idx])]
-        g_select.remove(i)
+        for i_i in range(i+1):
+            if i_i in g_select:
+                g_select.remove(i_i)
         i_select = list(range(nfeats))
-        for k in range(feats_length[subj_idx]):
-            i_select.remove(feats_start[subj_idx] + k)
-        g_scores += list(mmat[i, g_select])
-        i_scores += list(mmat[i, i_select])
+        # remove g_select
+        for subj_i in range(subj_idx+1):
+            for k in range(feats_length[subj_i]):
+                i_select.remove(feats_start[subj_i] + k)
+        if len(g_select) != 0:
+            g_scores += list(matt[i, g_select])
+        if len(i_select) != 0:
+            i_scores += list(matt[i, i_select])
 
     print("\n [*] Done")
-    return np.array(g_scores), np.array(i_scores), feats_length, mmat
+    return np.array(g_scores), np.array(i_scores), feats_length, matt
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/right-yolov5x-csl/right-index/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/right-yolov5x-csl/right-little/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/right-index-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/right-little-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
                     default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/ckpt_epoch_2020.pth",

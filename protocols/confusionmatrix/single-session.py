@@ -44,7 +44,6 @@ sys.path.insert(0, parent_dir)
 
 transform = transforms.Compose([transforms.ToTensor()])
 
-
 def calc_feats(path):
     """
     1.Read a image from given a path
@@ -79,7 +78,7 @@ def calc_feats_more(*paths, size=(208, 184)):
     container = np.zeros((len(paths), 3, h, w))
     for i, path in enumerate(paths):
         image = np.array(
-            Image.open(path).convert('RGB').resize(size=size),
+            Image.open(path).convert('RGB'),
             dtype=np.float32
         )
         image = image[8:-8, :, :]

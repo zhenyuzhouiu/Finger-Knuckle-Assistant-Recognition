@@ -12,14 +12,14 @@ import argparse
 from plotroc_basic import *
 
 
-src_npy = ['/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all/left-little-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all/left-ring-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all/left-middle-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all/left-index-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all/right-index-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all/right-middle-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all/right-ring-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all/right-little-protocol.npy',
+src_npy = ['/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/left-little-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/left-ring-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/left-middle-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/left-index-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/right-index-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/right-middle-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/right-ring-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/right-little-protocol.npy',
            '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-11-02-21-24/output/finger-knuckle-2018-133-128-all-to-all/09-protocol.npy',
            '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-11-02-21-24/output/finger-knuckle-2018-133-128-all-to-all/10-protocol.npy',]
 
@@ -47,7 +47,7 @@ color = ['#ff0000',
          '#808000',
          '#ff00ff',
          '#ff0000']
-dst = '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all/roc.pdf'
+dst = '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/roc.pdf'
 
 for i in range(8):
     data = np.load(src_npy[i], allow_pickle=True)[()]

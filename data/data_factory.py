@@ -152,7 +152,7 @@ def reminderpick_list(src, list_except=None):
 
 class Factory(torch.utils.data.Dataset):
     def __init__(self, img_path, feature_path, input_size,
-                 transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True):
+                 transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True, n_tuple="triplet"):
         self.ext = valid_ext
         self.transform = transform
         self._has_ext = lambda f: True if [e for e in self.ext if e in f] else False
@@ -160,6 +160,7 @@ class Factory(torch.utils.data.Dataset):
         self.feature_folder = feature_path
         self.train = train
         self.input_size = input_size
+        self.n_tuple = n_tuple
 
         if not exists(self.folder):
             raise RuntimeError('Dataset not found: {}'.format(self.folder))
@@ -173,7 +174,12 @@ class Factory(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         if self.train:
-            return self._triplet_trainitems(index)
+            if self.n_tuple == "feature":
+                return self._feature_trainitems(index)
+            elif self.n_tuple == "quadruplet":
+                return self._quadruplet_trainitems(index)
+            else:
+                return self._triplet_trainitems(index)
         else:
             return self._get_testitems(index)
 
@@ -230,14 +236,8 @@ class Factory(torch.utils.data.Dataset):
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L'), -1))
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
         img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
-        # stride_8 = load_feature_8(join(self.feature_folder, selected_folder), image_name=anchor)
-        # stride_16 = load_feature_16(join(self.feature_folder, selected_folder), image_name=anchor)
-        # stride_32 = load_feature_32(join(self.feature_folder, selected_folder), image_name=anchor)
         for p in positive:
             img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
-            # stride_8 = torch.cat([stride_8, load_feature_8(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
-            # stride_16 = torch.cat([stride_16, load_feature_16(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
-            # stride_32 = torch.cat([stride_32, load_feature_32(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
 
         # Negative samples 2 times than positive
         for i in range(2):
@@ -246,12 +246,7 @@ class Factory(torch.utils.data.Dataset):
             negative = reminderpick_list(self.fdict[negative_folder])
             for n in negative:
                 img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
-                # stride_8 = torch.cat(
-                #     [stride_8, load_feature_8(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
-                # stride_16 = torch.cat(
-                #     [stride_16, load_feature_16(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
-                # stride_32 = torch.cat(
-                #     [stride_32, load_feature_32(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
+
         # img is the data
         # junk is the label
         img = np.concatenate(img, axis=-1)
@@ -267,7 +262,105 @@ class Factory(torch.utils.data.Dataset):
         # stride_8.shape:-> [320*3*samples_subject, 32, 32]; stride_8.type:-> tensor
         # stride_16.shape:-> [640*3*samples_subject, 16, 16]
         # stride_32.shape:-> [1280*3*samples_subject, 8, 8]
-        return img, junk, junk, junk, junk
+        return img, junk
+
+    def _feature_trainitems(self, index):
+        # ======================= get images and corresponding features and label
+        # Per index, per subject
+        selected_folder = self.subfolder_names[index]
+        list_folders = [selected_folder]
+        anchor = randpick_list(self.fdict[selected_folder])
+        positive = reminderpick_list(self.fdict[selected_folder], [anchor])
+
+        # options = 'L' just convert image to gray image
+        # img = []
+        # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L'), -1))
+        # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
+        img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
+        stride_8 = load_feature_8(join(self.feature_folder, selected_folder), image_name=anchor)
+        stride_16 = load_feature_16(join(self.feature_folder, selected_folder), image_name=anchor)
+        stride_32 = load_feature_32(join(self.feature_folder, selected_folder), image_name=anchor)
+        for p in positive:
+            img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
+            stride_8 = torch.cat([stride_8, load_feature_8(join(self.feature_folder, selected_folder), image_name=p)],
+                                 dim=0)
+            stride_16 = torch.cat(
+                [stride_16, load_feature_16(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
+            stride_32 = torch.cat(
+                [stride_32, load_feature_32(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
+
+        # Negative samples 2 times than positive
+        for i in range(2):
+            negative_folder = randpick_list(self.subfolder_names, list_folders)
+            list_folders.append(negative_folder)
+            negative = reminderpick_list(self.fdict[negative_folder])
+            for n in negative:
+                img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
+                stride_8 = torch.cat(
+                    [stride_8, load_feature_8(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
+                stride_16 = torch.cat(
+                    [stride_16, load_feature_16(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
+                stride_32 = torch.cat(
+                    [stride_32, load_feature_32(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
+        # img is the data
+        # junk is the label
+        img = np.concatenate(img, axis=-1)
+        junk = np.array([0])
+        if self.transform is not None:
+            # Converts a PIL Image or numpy.ndarray (H x W x C) in the range [0, 255]
+            # to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0]
+            # if the PIL Image belongs to one of the modes (L, LA, P, I, F, RGB, YCbCr, RGBA, CMYK, 1)
+            # or if the numpy.ndarray has dtype = np.uint8
+            # In the other cases, tensors are returned without scaling.
+            img = self.transform(img)
+
+        # stride_8.shape:-> [320*3*samples_subject, 32, 32]; stride_8.type:-> tensor
+        # stride_16.shape:-> [640*3*samples_subject, 16, 16]
+        # stride_32.shape:-> [1280*3*samples_subject, 8, 8]
+        return img, junk, stride_8, stride_16, stride_32
+
+    def _quadruplet_trainitems(self, index):
+        # ======================= get images and corresponding features and label
+        # Per index, per subject
+        selected_folder = self.subfolder_names[index]
+        list_folders = [selected_folder]
+        anchor = randpick_list(self.fdict[selected_folder])
+        positive = reminderpick_list(self.fdict[selected_folder], [anchor])
+
+        img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
+        for p in positive:
+            img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
+
+        # Negative samples 2 times than positive
+        # the first class negative sample
+        for i in range(2):
+            negative_folder = randpick_list(self.subfolder_names, list_folders)
+            list_folders.append(negative_folder)
+            negative = reminderpick_list(self.fdict[negative_folder])
+            for n in negative:
+                img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
+
+        for i in range(2):
+            negative_folder = randpick_list(self.subfolder_names, list_folders)
+            list_folders.append(negative_folder)
+            negative = reminderpick_list(self.fdict[negative_folder])
+            for n in negative:
+                img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
+
+        # img is the data
+        # junk is the label
+        img = np.concatenate(img, axis=-1)
+        junk = np.array([0])
+        if self.transform is not None:
+            # Converts a PIL Image or numpy.ndarray (H x W x C) in the range [0, 255]
+            # to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0]
+            # if the PIL Image belongs to one of the modes (L, LA, P, I, F, RGB, YCbCr, RGBA, CMYK, 1)
+            # or if the numpy.ndarray has dtype = np.uint8
+            # In the other cases, tensors are returned without scaling.
+            img = self.transform(img)
+        # img.shape = [samples_subject * 5 * 3, h, w]
+        # img.shape = [75, h, w]
+        return img, junk
 
     def _get_testitems(self, index):
         fname = self.inames[index]

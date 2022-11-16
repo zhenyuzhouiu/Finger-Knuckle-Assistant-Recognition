@@ -25,11 +25,15 @@ def build_parser():
 
     # Dataset Options
     parser.add_argument('--train_path', type=str, dest='train_path',
-                        default='/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-left-middle/')
+                        default='/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/03/')
     parser.add_argument('--feature_path', type=str, dest='feature_path',
                         default='/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/feature/03/')
+    parser.add_argument('--conf_path', type=str, dest='conf_path',
+                        default='media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnuckleDatabase/Finger-knuckle/conf/03/')
     parser.add_argument('--samples_subject', type=int, dest='samples_subject',
                         default=5)
+    parser.add_argument('--n_tuple', type=str, dest='n_tuple',
+                        default='triplet', help="how to select the input tuple, triplet, quadruplet, feature")
 
     # Training Strategy
     parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
@@ -41,6 +45,7 @@ def build_parser():
     # Pre-defined Options
     parser.add_argument('--shifttype', type=str, dest='shifttype', default='wholeimagerotationandtranslation')
     parser.add_argument('--alpha', type=float, dest='alpha', default=20)
+    parser.add_argument('--alpha2', type=float, dest='alpha2', default=10, help="the second margin of quadruplet loss")
     parser.add_argument('--model', type=str, dest='model', default="RFNet")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(208, 184), help="(w, h)")
     parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=0)
@@ -91,9 +96,15 @@ def main():
 
     writer = SummaryWriter(log_dir=logdir)
     model_ = Model(args, writer=writer)
-    model_.triplet_train(args)
-    # model_.fusion_triplet_train(args)
-    # model_.assistant_triplet_train(args)
+    if args.n_tuple == "feature":
+        model_.fusion_triplet_train(args)
+        # model_.assistant_triplet_train(args)
+    elif args.n_tuple == "quadruplet":
+        model_.quadruplet_loss(args)
+    else:
+        model_.triplet_train(args)
+
+
 
 
 if __name__ == "__main__":

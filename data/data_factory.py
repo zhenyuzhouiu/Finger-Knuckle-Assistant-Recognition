@@ -230,14 +230,14 @@ class Factory(torch.utils.data.Dataset):
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L'), -1))
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
         img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
-        stride_8 = load_feature_8(join(self.feature_folder, selected_folder), image_name=anchor)
-        stride_16 = load_feature_16(join(self.feature_folder, selected_folder), image_name=anchor)
-        stride_32 = load_feature_32(join(self.feature_folder, selected_folder), image_name=anchor)
+        # stride_8 = load_feature_8(join(self.feature_folder, selected_folder), image_name=anchor)
+        # stride_16 = load_feature_16(join(self.feature_folder, selected_folder), image_name=anchor)
+        # stride_32 = load_feature_32(join(self.feature_folder, selected_folder), image_name=anchor)
         for p in positive:
             img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
-            stride_8 = torch.cat([stride_8, load_feature_8(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
-            stride_16 = torch.cat([stride_16, load_feature_16(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
-            stride_32 = torch.cat([stride_32, load_feature_32(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
+            # stride_8 = torch.cat([stride_8, load_feature_8(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
+            # stride_16 = torch.cat([stride_16, load_feature_16(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
+            # stride_32 = torch.cat([stride_32, load_feature_32(join(self.feature_folder, selected_folder), image_name=p)], dim=0)
 
         # Negative samples 2 times than positive
         for i in range(2):
@@ -246,12 +246,12 @@ class Factory(torch.utils.data.Dataset):
             negative = reminderpick_list(self.fdict[negative_folder])
             for n in negative:
                 img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
-                stride_8 = torch.cat(
-                    [stride_8, load_feature_8(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
-                stride_16 = torch.cat(
-                    [stride_16, load_feature_16(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
-                stride_32 = torch.cat(
-                    [stride_32, load_feature_32(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
+                # stride_8 = torch.cat(
+                #     [stride_8, load_feature_8(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
+                # stride_16 = torch.cat(
+                #     [stride_16, load_feature_16(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
+                # stride_32 = torch.cat(
+                #     [stride_32, load_feature_32(join(self.feature_folder, negative_folder), image_name=n)], dim=0)
         # img is the data
         # junk is the label
         img = np.concatenate(img, axis=-1)
@@ -267,7 +267,7 @@ class Factory(torch.utils.data.Dataset):
         # stride_8.shape:-> [320*3*samples_subject, 32, 32]; stride_8.type:-> tensor
         # stride_16.shape:-> [640*3*samples_subject, 16, 16]
         # stride_32.shape:-> [1280*3*samples_subject, 8, 8]
-        return img, junk, stride_8, stride_16, stride_32
+        return img, junk, junk, junk, junk
 
     def _get_testitems(self, index):
         fname = self.inames[index]

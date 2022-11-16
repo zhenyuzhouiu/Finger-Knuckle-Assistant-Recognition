@@ -226,7 +226,7 @@ class Model(object):
             # for batch_id, (x, _) in enumerate(self.train_loader):
             # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
             loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
-            for batch_id, (x, _, assistant_f8, assistant_f16, assistant_f32) in loop:
+            for batch_id, (x, _) in loop:
                 # ======================================================== train inference model
                 # x.shape :-> [b, 3*5*samples_subject, h, w]
                 # as for the 3*5*samples_subject, the first 3*samples contains 1 anchor and (samples-1) positive

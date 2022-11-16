@@ -324,8 +324,3 @@ class FusionModel(torch.nn.Module):
         return out
 
 
-
-
-
-
-

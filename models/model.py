@@ -49,13 +49,13 @@ class Model(object):
             transforms.ToTensor()
         ])
         train_dataset = Factory(args.train_path, args.feature_path, args.input_size, transform=transform,
-                                valid_ext=['.bmp', '.jpg', '.JPG'], train=True. args.n_tuple)
+                                valid_ext=['.bmp', '.jpg', '.JPG'], train=True, n_tuple=args.n_tuple)
         logging("Successfully Load {} as training dataset...".format(args.train_path))
         train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
 
-        if args.n_tuple in ['triplet', 'feture']:
+        if args.n_tuple in ['triplet']:
             examples = iter(train_loader)
-            example_data, example_target, example_feature8, example_feature16, example_feature32 = examples.next()
+            example_data, example_target = examples.next()
             example_anchor = example_data[:, 0:3, :, :]
             example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
             example_negative = example_data[:, 3 * self.samples_subject:, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
@@ -65,13 +65,28 @@ class Model(object):
             self.writer.add_image(tag="positive", img_tensor=positive_grid)
             negative_grid = torchvision.utils.make_grid(example_negative)
             self.writer.add_image(tag="negative", img_tensor=negative_grid)
-        else:
+        elif args.n_tuple == "quadruplet":
             # for showing quadruplet
+            examples = iter(train_loader)
+            example_data, example_target = examples.next()
+            example_anchor = example_data[:, 0:3, :, :]
+            example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
+            example_negative = example_data[:, 3 * self.samples_subject:3*3*self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
+            example_negative2 = example_data[:, 3 * 3 * self.samples_subject:, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
+            anchor_grid = torchvision.utils.make_grid(example_anchor)
+            self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
+            positive_grid = torchvision.utils.make_grid(example_positive)
+            self.writer.add_image(tag="positive", img_tensor=positive_grid)
+            negative_grid = torchvision.utils.make_grid(example_negative)
+            self.writer.add_image(tag="negative", img_tensor=negative_grid)
+            negative2_grid = torchvision.utils.make_grid(example_negative2)
+            self.writer.add_image(tag="negative2", img_tensor=negative2_grid)
+        else:
             examples = iter(train_loader)
             example_data, example_target, example_feature8, example_feature16, example_feature32 = examples.next()
             example_anchor = example_data[:, 0:3, :, :]
             example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
+            example_negative = example_data[:, 3 * self.samples_subject:3*3*self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
             anchor_grid = torchvision.utils.make_grid(example_anchor)
             self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
             positive_grid = torchvision.utils.make_grid(example_positive)

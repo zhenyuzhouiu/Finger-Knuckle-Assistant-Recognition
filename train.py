@@ -4,7 +4,7 @@
 # =========================================================
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import argparse
 import shutil
@@ -20,7 +20,7 @@ def build_parser():
     # Checkpoint Options
     parser.add_argument('--checkpoint_dir', type=str,
                         dest='checkpoint_dir', default='./checkpoint/Joint-Finger-RFNet/')
-    parser.add_argument('--db_prefix', dest='db_prefix', default='Mask-Left-Middle')
+    parser.add_argument('--db_prefix', dest='db_prefix', default='MaskLM')
     parser.add_argument('--checkpoint_interval', type=int, dest='checkpoint_interval', default=20)
 
     # Dataset Options
@@ -43,11 +43,10 @@ def build_parser():
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
     # Pre-defined Options
-    parser.add_argument('--shifttype', type=str, dest='shifttype', default='wholeimagerotationandtranslation')
-    parser.add_argument('--alpha', type=float, dest='alpha', default=20)
+    parser.add_argument('--alpha', type=float, dest='alpha', default=40)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=10, help="the second margin of quadruplet loss")
     parser.add_argument('--model', type=str, dest='model', default="RFNet")
-    parser.add_argument('--input_size', type=int, dest='input_size', default=(208, 184), help="(w, h)")
+    parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
     parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=0)
     parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=0)
     parser.add_argument('--block_size', type=int, dest="block_size", default=8)
@@ -62,17 +61,17 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    this_datetime = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M')
+    this_datetime = datetime.datetime.now().strftime('%m-%d-%H-%M')
     args.checkpoint_dir = os.path.join(
         args.checkpoint_dir,
-        "{}_{}-{}-lr{}-subs{}-angle{}-a{}-hs{}_vs{}_{}".format(
+        "{}_{}_{}-lr{}-r{}-a{}-2a{}-hs{}_vs{}_{}".format(
             args.db_prefix,
             args.model,
-            args.shifttype,
+            args.n_tuple,
             float(args.learning_rate),
-            int(args.block_size),
             int(args.rotate_angle),
             int(args.alpha),
+            int(args.alpha2),
             int(args.horizontal_size),
             int(args.vertical_size),
             this_datetime

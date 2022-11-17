@@ -4,7 +4,7 @@
 # =========================================================
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import argparse
 import shutil
@@ -33,7 +33,7 @@ def build_parser():
     parser.add_argument('--samples_subject', type=int, dest='samples_subject',
                         default=5)
     parser.add_argument('--n_tuple', type=str, dest='n_tuple',
-                        default='quadruplet', help="how to select the input tuple, triplet, quadruplet, feature")
+                        default='triplet', help="how to select the input tuple, triplet, quadruplet, feature")
 
     # Training Strategy
     parser.add_argument('--batch_size', type=int, dest='batch_size', default=3)
@@ -43,7 +43,7 @@ def build_parser():
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
     # Pre-defined Options
-    parser.add_argument('--alpha', type=float, dest='alpha', default=20)
+    parser.add_argument('--alpha', type=float, dest='alpha', default=1)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=20, help="the second margin of quadruplet loss")
     parser.add_argument('--model', type=str, dest='model', default="RFNet")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
@@ -61,7 +61,7 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
-    this_datetime = datetime.datetime.now().strftime('%m-%d-%H-%M')
+    this_datetime = datetime.datetime.now().strftime('%m-%d-%H-%M-%S')
     args.checkpoint_dir = os.path.join(
         args.checkpoint_dir,
         "{}_{}_{}-lr{}-r{}-a{}-2a{}-hs{}_vs{}_{}".format(

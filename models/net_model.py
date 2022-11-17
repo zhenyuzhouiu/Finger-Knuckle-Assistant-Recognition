@@ -49,7 +49,7 @@ class ResidualFeatureNet(torch.nn.Module):
         resid3 = self.resid1(resid2)
         resid4 = self.resid1(resid3)
         conv4 = F.relu(self.conv4(resid4))
-        conv5 = F.relu(self.conv5(conv4))
+        conv5 = F.sigmoid(self.conv5(conv4))
 
         return conv5
 

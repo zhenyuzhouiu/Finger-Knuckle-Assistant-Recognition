@@ -232,7 +232,7 @@ class STNWithRFNet(torch.nn.Module):
 
         # Spatial Transformer Network
         self.localization = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=5),
+            nn.Conv2d(3, 16, kernel_size=5),
             nn.MaxPool2d(2, stride=2),
             nn.ReLU(True),
             nn.Conv2d(16, 32, kernel_size=3),
@@ -264,7 +264,7 @@ class STNWithRFNet(torch.nn.Module):
 
     def stn(self, x):
         xs = self.localization(x)
-        xs = xs.view(-1, 32 * 6 * 6)
+        xs = xs.view(-1, 32 * 30 * 30)
         theta = self.fc_loc(xs)
         theta = theta.view(-1, 2, 3)
         grid = F.affine_grid(theta, x.size(), align_corners=True)

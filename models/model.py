@@ -219,9 +219,6 @@ class Model(object):
                 agg_loss += loss.item()
                 train_loss += loss.item()
 
-                if agg_loss < 100:
-                    freeze_stn = False
-
                 loop.set_description(f'Epoch [{e}/{args.epochs}]')
                 loop.set_postfix(loss_inference="{:.6f}".format(agg_loss))
 
@@ -229,6 +226,9 @@ class Model(object):
                                    global_step=(e + 1))
             self.writer.add_scalar("loss_inference", scalar_value=train_loss,
                                    global_step=((e + 1) * epoch_steps))
+
+            if agg_loss < 66:
+                freeze_stn = False
 
             train_loss = 0
 

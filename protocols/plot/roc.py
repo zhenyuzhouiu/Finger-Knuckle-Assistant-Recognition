@@ -12,9 +12,9 @@ import argparse
 from plotroc_basic import *
 
 
-src_npy = ['/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.001-r0-a40-a210-hs0_vs0_11-16-18-13/output/01-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.001-r0-a40-a210-hs0_vs0_11-16-18-13/output/02-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.001-r0-a40-a210-hs0_vs0_11-16-18-13/output/04-protocol.npy',
+src_npy = ['/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_quadruplet-lr0.001-r0-a20-2a5-hs0_vs0_11-16-20-58/output/01-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_quadruplet-lr0.001-r0-a20-2a5-hs0_vs0_11-16-20-58/output/02-protocol.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_quadruplet-lr0.001-r0-a20-2a5-hs0_vs0_11-16-20-58/output/04-protocol.npy',
            '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Mask-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a10-hs0_vs0_2022-11-16-13-13/output/yolov5-software-208-184-all-to-all-up/left-index-protocol.npy',
            '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/right-index-protocol.npy',
            '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/yolov5-software-208-184-all-to-all-up/right-middle-protocol.npy',
@@ -47,7 +47,7 @@ color = ['#ff0000',
          '#808000',
          '#ff00ff',
          '#ff0000']
-dst = '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.001-r0-a40-a210-hs0_vs0_11-16-18-13/output/roc.pdf'
+dst = '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_quadruplet-lr0.001-r0-a20-2a5-hs0_vs0_11-16-20-58/output/roc.pdf'
 
 for i in range(3):
     data = np.load(src_npy[i], allow_pickle=True)[()]

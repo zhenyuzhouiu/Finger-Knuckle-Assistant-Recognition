@@ -4,7 +4,8 @@ import torch
 from tqdm import tqdm
 import torchvision.utils
 from torch.autograd import Variable
-from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel
+from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel, \
+    STNWithRFNet
 from models.loss_function import WholeImageRotationAndTranslation, ImageBlockRotationAndTranslation, \
     ShiftedLoss, MSELoss, HammingDistance
 from torchvision import transforms
@@ -31,7 +32,8 @@ model_dict = {
     "RFNWithSTNet": RFNWithSTNet().cuda(),
     "ConvNet": ConvNet().cuda(),
     "FusionNet": FusionModel().cuda(),
-    "AssistantModel": AssistantModel().cuda()
+    "AssistantModel": AssistantModel().cuda(),
+    "STNWithRFNet": STNWithRFNet().cuda()
 }
 
 
@@ -57,8 +59,10 @@ class Model(object):
             examples = iter(train_loader)
             example_data, example_target = examples.next()
             example_anchor = example_data[:, 0:3, :, :]
-            example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
+            example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
+                                                                                         example_anchor.size(3))
+            example_negative = example_data[:, 3 * self.samples_subject:, :, :].reshape(-1, 3, example_anchor.size(2),
+                                                                                        example_anchor.size(3))
             anchor_grid = torchvision.utils.make_grid(example_anchor)
             self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
             positive_grid = torchvision.utils.make_grid(example_positive)
@@ -70,9 +74,17 @@ class Model(object):
             examples = iter(train_loader)
             example_data, example_target = examples.next()
             example_anchor = example_data[:, 0:3, :, :]
-            example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:3*3*self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
-            example_negative2 = example_data[:, 3 * 3 * self.samples_subject:, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
+            example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
+                                                                                         example_anchor.size(3))
+            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1,
+                                                                                                                    3,
+                                                                                                                    example_anchor.size(
+                                                                                                                        2),
+                                                                                                                    example_anchor.size(
+                                                                                                                        3))
+            example_negative2 = example_data[:, 3 * 3 * self.samples_subject:, :, :].reshape(-1, 3,
+                                                                                             example_anchor.size(2),
+                                                                                             example_anchor.size(3))
             anchor_grid = torchvision.utils.make_grid(example_anchor)
             self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
             positive_grid = torchvision.utils.make_grid(example_positive)
@@ -85,8 +97,14 @@ class Model(object):
             examples = iter(train_loader)
             example_data, example_target, example_feature8, example_feature16, example_feature32 = examples.next()
             example_anchor = example_data[:, 0:3, :, :]
-            example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:3*3*self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
+            example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
+                                                                                         example_anchor.size(3))
+            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1,
+                                                                                                                    3,
+                                                                                                                    example_anchor.size(
+                                                                                                                        2),
+                                                                                                                    example_anchor.size(
+                                                                                                                        3))
             anchor_grid = torchvision.utils.make_grid(example_anchor)
             self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
             positive_grid = torchvision.utils.make_grid(example_positive)
@@ -103,7 +121,7 @@ class Model(object):
 
     def _build_model(self, args):
         if args.model not in ["RFNet", "DeConvRFNet", "FKEfficientNet",
-                              "RFNWithSTNet", "ConvNet", "FusionNet", "AssistantModel"]:
+                              "RFNWithSTNet", "ConvNet", "FusionNet", "AssistantModel", "STNWithRFNet"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         if args.model in ["FusionNet", "AssistantModel"]:
@@ -153,14 +171,14 @@ class Model(object):
             # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
             loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
             for batch_id, (x, _) in loop:
-                if args.model == "RFNWithSTNet":
+                if args.model in ["RFNWithSTNet", "STNWithRFNet"]:
                     if freeze_stn:
                         for name, para in self.inference.named_parameters():
-                            if "stn" in name:
+                            if "localization" in name or "fc_loc" in name:
                                 para.requires_grad_(False)
                     else:
                         for name, para in self.inference.named_parameters():
-                            if "stn" in name:
+                            if "localization" in name or "fc_loc" in name:
                                 para.requires_grad_(True)
 
                 # ================================================:======== train inference model
@@ -255,8 +273,8 @@ class Model(object):
 
                 anchor_fm = fms[:, 0, :, :].unsqueeze(1)  # anchor has one sample
                 pos_fm = fms[:, 1:self.samples_subject, :, :].contiguous()
-                neg_fm = fms[:, self.samples_subject:3*self.samples_subject, :, :].contiguous()
-                neg2_fm = fms[:, 3*self.samples_subject:, :, :].contiguous()
+                neg_fm = fms[:, self.samples_subject:3 * self.samples_subject, :, :].contiguous()
+                neg2_fm = fms[:, 3 * self.samples_subject:, :, :].contiguous()
                 # distance anchor negative
                 nneg = neg_fm.size(1)
                 neg_fm = neg_fm.view(-1, 1, neg_fm.size(2), neg_fm.size(3))
@@ -332,11 +350,14 @@ class Model(object):
                 assistant_f32 = Variable(assistant_f32, requires_grad=False)
 
                 fms_assistant = self.inference(assistant_f8.view(-1, 320, assistant_f8.size(2), assistant_f8.size(3)),
-                                               assistant_f16.view(-1, 640, assistant_f16.size(2), assistant_f16.size(3)),
-                                               assistant_f32.view(-1, 1280, assistant_f32.size(2), assistant_f32.size(3)))
+                                               assistant_f16.view(-1, 640, assistant_f16.size(2),
+                                                                  assistant_f16.size(3)),
+                                               assistant_f32.view(-1, 1280, assistant_f32.size(2),
+                                                                  assistant_f32.size(3)))
 
                 # (batch_size, 12, 32, 32)
-                fms_assistant = fms_assistant.view(assistant_f8.size(0), -1, fms_assistant.size(2), fms_assistant.size(3))
+                fms_assistant = fms_assistant.view(assistant_f8.size(0), -1, fms_assistant.size(2),
+                                                   fms_assistant.size(3))
 
                 anchor_fm = fms_assistant[:, 0, :, :].unsqueeze(1)
                 pos_fm = fms_assistant[:, 1:self.samples_subject, :, :].contiguous()
@@ -350,7 +371,8 @@ class Model(object):
 
                 npos = pos_fm.size(1)
                 pos_fm = pos_fm.view(-1, 1, pos_fm.size(2), pos_fm.size(3))
-                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)), pos_fm)
+                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
+                                    pos_fm)
                 ap_loss = ap_loss.view((-1, npos)).max(1)[0]
 
                 sstl = ap_loss - an_loss + args.alpha

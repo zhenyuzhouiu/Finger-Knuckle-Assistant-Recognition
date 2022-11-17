@@ -49,6 +49,7 @@ class ResidualFeatureNet(torch.nn.Module):
         resid3 = self.resid1(resid2)
         resid4 = self.resid1(resid3)
         conv4 = F.relu(self.conv4(resid4))
+        # the origin version is F.relu
         conv5 = F.sigmoid(self.conv5(conv4))
 
         return conv5
@@ -72,6 +73,7 @@ class ResidualFeatureNet_Nohead(torch.nn.Module):
         resid2 = self.resid1(resid1)
 
         return resid2
+
 
 class ConvNet(torch.nn.Module):
     def __init__(self):
@@ -154,15 +156,15 @@ class RFNWithSTNet(torch.nn.Module):
 
         # Spatial Transformer Network
         self.localization = nn.Sequential(
-            nn.Conv2d(1, 8, kernel_size=7),
+            nn.Conv2d(1, 16, kernel_size=5),
             nn.MaxPool2d(2, stride=2),
             nn.ReLU(True),
-            nn.Conv2d(8, 10, kernel_size=5),
+            nn.Conv2d(16, 32, kernel_size=3),
             nn.MaxPool2d(2, stride=2),
             nn.ReLU(True)
         )
         self.fc_loc = nn.Sequential(
-            nn.Linear(10 * 4 * 4, 32),
+            nn.Linear(32 * 6 * 6, 32),
             nn.ReLU(True),
             nn.Linear(32, 3 * 2)
         )
@@ -242,7 +244,7 @@ class AssistantModel(torch.nn.Module):
 
         x32 = self.upsample(x32)
         x32 = F.relu(self.bn1(self.conv1(x32)))
-        x16 = x16+x32
+        x16 = x16 + x32
         x16 = self.upsample(x16)
         x16 = F.relu(self.bn2(self.conv2(x16)))
         x8 = x8 + x16
@@ -260,6 +262,7 @@ class FusionModel(torch.nn.Module):
     """
     Fuse segmented finger knuckle features and yolov5's output feature
     """
+
     def __init__(self):
         super(FusionModel, self).__init__()
         # fuse yolov5 features
@@ -322,5 +325,3 @@ class FusionModel(torch.nn.Module):
         out = F.relu(self.conv6(out))
 
         return out
-
-

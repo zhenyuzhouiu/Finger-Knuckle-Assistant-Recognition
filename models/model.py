@@ -142,6 +142,8 @@ class Model(object):
 
         # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
         scheduler = MultiStepLR(self.optimizer, milestones=[10, 500, 1000], gamma=0.1)
+        # for freeze spatial transformer network
+        freeze_stn = True
 
         for e in range(start_epoch, args.epochs + start_epoch):
             # self.exp_lr_scheduler(e, lr_decay_epoch=100)
@@ -151,7 +153,17 @@ class Model(object):
             # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
             loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
             for batch_id, (x, _) in loop:
-                # ======================================================== train inference model
+                if args.model == "RFNWithSTNet":
+                    if freeze_stn:
+                        for name, para in self.inference.named_parameters():
+                            if "stn" in name:
+                                para.requires_grad_(False)
+                    else:
+                        for name, para in self.inference.named_parameters():
+                            if "stn" in name:
+                                para.requires_grad_(True)
+
+                # ================================================:======== train inference model
                 # x.shape :-> [b, 3*3*samples_subject, h, w]
                 # y.shape:
                 x = x.cuda()
@@ -188,6 +200,9 @@ class Model(object):
                 self.optimizer.zero_grad()
                 agg_loss += loss.item()
                 train_loss += loss.item()
+
+                if agg_loss < 100:
+                    freeze_stn = False
 
                 loop.set_description(f'Epoch [{e}/{args.epochs}]')
                 loop.set_postfix(loss_inference="{:.6f}".format(agg_loss))

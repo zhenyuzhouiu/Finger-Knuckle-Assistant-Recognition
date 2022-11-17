@@ -10,6 +10,7 @@
 #         I-Scores: Subjects * (Subject-1) * (Samples * Samples) / 2
 # =========================================================
 import os
+
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import sys
@@ -102,6 +103,55 @@ def genuine_imposter(test_path):
         loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :])
         matching_matrix[:-i, i] = loss
         print("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
+        # sys.stdout.write("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
+        # sys.stdout.flush()
+
+    mmat = np.ones_like(matching_matrix) * 1e5
+    mmat[0, :] = matching_matrix[0, :]
+    for i in range(1, feats_all.size(0)):
+        mmat[i, i:] = matching_matrix[i, :-i]
+        for j in range(i):
+            mmat[i, j] = matching_matrix[j, i - j]
+    print("\n [*] Done")
+
+    g_scores = []
+    i_scores = []
+    for i in range(nfeats):
+        subj_idx = np.argmax(acc_len > i)
+        g_select = [feats_start[subj_idx] + k for k in range(feats_length[subj_idx])]
+        g_select.remove(i)
+        i_select = list(range(nfeats))
+        for k in range(feats_length[subj_idx]):
+            i_select.remove(feats_start[subj_idx] + k)
+        g_scores += list(mmat[i, g_select])
+        i_scores += list(mmat[i, i_select])
+
+    print("\n [*] Done")
+    return np.array(g_scores), np.array(i_scores), feats_length, mmat
+
+
+def genuine_imposter_upright(test_path):
+    subs = subfolders(test_path, preserve_prefix=True)
+    subs.sort()
+    feats_all = []
+    feats_length = []
+    nfeats = 0
+    for i, usr in enumerate(subs):
+        subims = subimages(usr, preserve_prefix=True)
+        subims.sort()
+        nfeats += len(subims)
+        feats_length.append(len(subims))
+        feats_all.append(calc_feats_more(*subims))
+    feats_length = np.array(feats_length)
+    acc_len = np.cumsum(feats_length)
+    feats_start = acc_len - feats_length
+
+    feats_all = torch.from_numpy(np.concatenate(feats_all, 0)).cuda()
+    matching_matrix = np.ones((nfeats, nfeats)) * 1e5
+    for i in range(1, feats_all.size(0)):
+        loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :])
+        matching_matrix[:-i, i] = loss
+        print("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
 
     matt = np.ones_like(matching_matrix) * 1e5
     matt[0, :] = matching_matrix[0, :]
@@ -119,12 +169,12 @@ def genuine_imposter(test_path):
         # the indices corresponding to the first occurrence are returned.
         subj_idx = np.argmax(acc_len > i)
         g_select = [feats_start[subj_idx] + k for k in range(feats_length[subj_idx])]
-        for i_i in range(i+1):
+        for i_i in range(i + 1):
             if i_i in g_select:
                 g_select.remove(i_i)
         i_select = list(range(nfeats))
         # remove g_select
-        for subj_i in range(subj_idx+1):
+        for subj_i in range(subj_idx + 1):
             for k in range(feats_length[subj_i]):
                 i_select.remove(feats_start[subj_i] + k)
         if len(g_select) != 0:
@@ -184,7 +234,7 @@ def _loss(feats1, feats2):
 inference = inference.cuda()
 inference.eval()
 
-gscores, iscores, _, mmat = genuine_imposter(args.test_path)
+gscores, iscores, _, mmat = genuine_imposter_upright(args.test_path)
 
 if args.save_mmat:
     np.save(args.out_path, {"g_scores": gscores, "i_scores": iscores, "mmat": mmat})

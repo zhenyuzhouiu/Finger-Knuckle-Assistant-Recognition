@@ -51,6 +51,7 @@ class ResidualFeatureNet(torch.nn.Module):
         conv4 = F.relu(self.conv4(resid4))
         # the origin version is F.relu
         conv5 = F.sigmoid(self.conv5(conv4))
+        # conv5 = F.relu(self.conv5(conv4))
 
         return conv5
 
@@ -195,15 +196,25 @@ class RFNWithSTNet(torch.nn.Module):
         return x
 
     def forward(self, x):
-        conv1 = F.relu(self.bn1(self.conv1(x)))
-        conv2 = F.relu(self.bn2(self.conv2(conv1)))
-        conv3 = F.relu(self.bn3(self.conv3(conv2)))
+        # conv1 = F.relu(self.bn1(self.conv1(x)))
+        # conv2 = F.relu(self.bn2(self.conv2(conv1)))
+        # conv3 = F.relu(self.bn3(self.conv3(conv2)))
+        # resid1 = self.resid1(conv3)
+        # resid2 = self.resid1(resid1)
+        # resid3 = self.resid1(resid2)
+        # resid4 = self.resid1(resid3)
+        # conv4 = F.relu(self.bn4(self.conv4(resid4)))
+        # conv5 = F.relu(self.bn5(self.conv5(conv4)))
+
+        conv1 = F.relu(self.conv1(x))
+        conv2 = F.relu(self.conv2(conv1))
+        conv3 = F.relu(self.conv3(conv2))
         resid1 = self.resid1(conv3)
         resid2 = self.resid1(resid1)
         resid3 = self.resid1(resid2)
         resid4 = self.resid1(resid3)
-        conv4 = F.relu(self.bn4(self.conv4(resid4)))
-        conv5 = F.relu(self.bn5(self.conv5(conv4)))
+        conv4 = F.relu(self.conv4(resid4))
+        conv5 = F.relu(self.conv5(conv4))
 
         out = self.stn(conv5)
 
@@ -242,7 +253,7 @@ class STNWithRFNet(torch.nn.Module):
         self.fc_loc = nn.Sequential(
             nn.Linear(32 * 30 * 30, 32 * 30),
             nn.ReLU(True),
-            nn.Linear(32*30, 32),
+            nn.Linear(32 * 30, 32),
             nn.ReLU(True),
             nn.Linear(32, 3 * 2)
         )
@@ -274,17 +285,28 @@ class STNWithRFNet(torch.nn.Module):
 
     def forward(self, x):
         x = self.stn(x)
-        conv1 = F.relu(self.bn1(self.conv1(x)))
-        conv2 = F.relu(self.bn2(self.conv2(conv1)))
-        conv3 = F.relu(self.bn3(self.conv3(conv2)))
+        # conv1 = F.relu(self.bn1(self.conv1(x)))
+        # conv2 = F.relu(self.bn2(self.conv2(conv1)))
+        # conv3 = F.relu(self.bn3(self.conv3(conv2)))
+        # resid1 = self.resid1(conv3)
+        # resid2 = self.resid1(resid1)
+        # resid3 = self.resid1(resid2)
+        # resid4 = self.resid1(resid3)
+        # conv4 = F.relu(self.bn4(self.conv4(resid4)))
+        # conv5 = F.relu(self.bn5(self.conv5(conv4)))
+
+        conv1 = F.relu(self.conv1(x))
+        conv2 = F.relu(self.conv2(conv1))
+        conv3 = F.relu(self.conv3(conv2))
         resid1 = self.resid1(conv3)
         resid2 = self.resid1(resid1)
         resid3 = self.resid1(resid2)
         resid4 = self.resid1(resid3)
-        conv4 = F.relu(self.bn4(self.conv4(resid4)))
-        conv5 = F.relu(self.bn5(self.conv5(conv4)))
+        conv4 = F.relu(self.conv4(resid4))
+        conv5 = F.relu(self.conv5(conv4))
 
         return conv5
+
 
 class AssistantModel(torch.nn.Module):
     def __init__(self):

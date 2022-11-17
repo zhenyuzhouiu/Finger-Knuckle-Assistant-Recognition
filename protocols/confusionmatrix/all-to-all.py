@@ -12,7 +12,7 @@
 import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import sys
 from PIL import Image
 import numpy as np
@@ -188,13 +188,13 @@ def genuine_imposter_upright(test_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/04/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/01/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_quadruplet-lr0.001-r0-a20-2a20-hs0_vs0_11-16-20-45/output/04-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_STNWithRFNet_triplet-lr0.001-r0-a10-2a20-hs0_vs0_11-17-15-11-07/output/01-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_quadruplet-lr0.001-r0-a20-2a20-hs0_vs0_11-16-20-45/ckpt_epoch_3000.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_STNWithRFNet_triplet-lr0.001-r0-a10-2a20-hs0_vs0_11-17-15-11-07/ckpt_epoch_3000.pth",
                     dest="model_path")
 parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
 parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
@@ -202,7 +202,7 @@ parser.add_argument('--block_size', type=int, dest="block_size", default=8)
 parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=0)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-parser.add_argument('--model', type=str, dest='model', default="RFNet")
+parser.add_argument('--model', type=str, dest='model', default="STNWithRFNet")
 
 model_dict = {
     "RFNet": models.net_model.ResidualFeatureNet().cuda(),
@@ -210,6 +210,7 @@ model_dict = {
     "EfficientNetV2-S": models.EfficientNetV2.efficientnetv2_s().cuda(),
     "RFNWithSTNet": models.net_model.RFNWithSTNet().cuda(),
     "ConvNet": models.net_model.ConvNet().cuda(),
+    "STNWithRFNet": models.net_model.STNWithRFNet().cuda()
 }
 
 args = parser.parse_args()

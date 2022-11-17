@@ -50,8 +50,8 @@ class ResidualFeatureNet(torch.nn.Module):
         resid4 = self.resid1(resid3)
         conv4 = F.relu(self.conv4(resid4))
         # the origin version is F.relu
-        conv5 = F.sigmoid(self.conv5(conv4))
-        # conv5 = F.relu(self.conv5(conv4))
+        # conv5 = F.sigmoid(self.conv5(conv4))
+        conv5 = F.relu(self.conv5(conv4))
 
         return conv5
 
@@ -170,17 +170,17 @@ class RFNWithSTNet(torch.nn.Module):
             nn.Linear(32, 3 * 2)
         )
 
-        for m in self.modules():
-            if isinstance(m, torch.nn.Conv2d):
-                torch.nn.init.kaiming_normal_(m.weight, mode="fan_out")
-                if m.bias is not None:
-                    torch.nn.init.zeros_(m.bias)
-            elif isinstance(m, torch.nn.BatchNorm2d):
-                nn.init.ones_(m.weight)
-                nn.init.zeros_(m.bias)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                nn.init.zeros_(m.bias)
+        # for m in self.modules():
+        #     if isinstance(m, torch.nn.Conv2d):
+        #         torch.nn.init.kaiming_normal_(m.weight, mode="fan_out")
+        #         if m.bias is not None:
+        #             torch.nn.init.zeros_(m.bias)
+        #     elif isinstance(m, torch.nn.BatchNorm2d):
+        #         nn.init.ones_(m.weight)
+        #         nn.init.zeros_(m.bias)
+        #     elif isinstance(m, nn.Linear):
+        #         nn.init.normal_(m.weight, 0, 0.01)
+        #         nn.init.zeros_(m.bias)
 
         self.fc_loc[2].weight.data.zero_()
         self.fc_loc[2].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
@@ -258,17 +258,17 @@ class STNWithRFNet(torch.nn.Module):
             nn.Linear(32, 3 * 2)
         )
 
-        for m in self.modules():
-            if isinstance(m, torch.nn.Conv2d):
-                torch.nn.init.kaiming_normal_(m.weight, mode="fan_out")
-                if m.bias is not None:
-                    torch.nn.init.zeros_(m.bias)
-            elif isinstance(m, torch.nn.BatchNorm2d):
-                nn.init.ones_(m.weight)
-                nn.init.zeros_(m.bias)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                nn.init.zeros_(m.bias)
+        # for m in self.modules():
+        #     if isinstance(m, torch.nn.Conv2d):
+        #         torch.nn.init.kaiming_normal_(m.weight, mode="fan_out")
+        #         if m.bias is not None:
+        #             torch.nn.init.zeros_(m.bias)
+        #     elif isinstance(m, torch.nn.BatchNorm2d):
+        #         nn.init.ones_(m.weight)
+        #         nn.init.zeros_(m.bias)
+        #     elif isinstance(m, nn.Linear):
+        #         nn.init.normal_(m.weight, 0, 0.01)
+        #         nn.init.zeros_(m.bias)
 
         self.fc_loc[4].weight.data.zero_()
         self.fc_loc[4].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))

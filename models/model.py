@@ -7,7 +7,7 @@ from torch.autograd import Variable
 
 import models.loss_function
 from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel, \
-    STNWithRFNet
+    STNWithRFNet, ResidualSTNet
 from models.loss_function import WholeImageRotationAndTranslation, ImageBlockRotationAndTranslation, \
     ShiftedLoss, MSELoss, HammingDistance
 from torchvision import transforms
@@ -35,7 +35,8 @@ model_dict = {
     "ConvNet": ConvNet().cuda(),
     "FusionNet": FusionModel().cuda(),
     "AssistantModel": AssistantModel().cuda(),
-    "STNWithRFNet": STNWithRFNet().cuda()
+    "STNWithRFNet": STNWithRFNet().cuda(),
+    "ResidualSTNet": ResidualSTNet().cuda()
 }
 
 
@@ -123,7 +124,7 @@ class Model(object):
 
     def _build_model(self, args):
         if args.model not in ["RFNet", "DeConvRFNet", "FKEfficientNet",
-                              "RFNWithSTNet", "ConvNet", "FusionNet", "AssistantModel", "STNWithRFNet"]:
+                              "RFNWithSTNet", "ConvNet", "FusionNet", "AssistantModel", "STNWithRFNet", "ResidualSTNet"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         if args.model in ["FusionNet", "AssistantModel"]:
@@ -143,10 +144,10 @@ class Model(object):
             data = Variable(data, requires_grad=False)
             self.writer.add_graph(inference, [data])
 
-        # loss = WholeImageRotationAndTranslation(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
-        # logging("Successfully building whole image rotation and translation triplet loss")
-        loss = models.loss_function.CosineSimilarity().cuda()
-        logging("Successfully building cosine similarity triplet loss")
+        loss = WholeImageRotationAndTranslation(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
+        logging("Successfully building whole image rotation and translation triplet loss")
+        # loss = models.loss_function.CosineSimilarity().cuda()
+        # logging("Successfully building cosine similarity triplet loss")
         inference.train()
         inference.cuda()
 
@@ -165,7 +166,7 @@ class Model(object):
         # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
         scheduler = MultiStepLR(self.optimizer, milestones=[10, 500, 1000], gamma=0.1)
         # for freeze spatial transformer network
-        freeze_stn = True
+        freeze_stn = False
 
         for e in range(start_epoch, args.epochs + start_epoch):
             # self.exp_lr_scheduler(e, lr_decay_epoch=100)
@@ -175,7 +176,7 @@ class Model(object):
             # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
             loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
             for batch_id, (x, _) in loop:
-                if args.model in ["RFNWithSTNet", "STNWithRFNet"]:
+                if args.model in ["RFNWithSTNet", "STNWithRFNet", "ResidualSTNet"]:
                     if freeze_stn:
                         for name, para in self.inference.named_parameters():
                             if "localization" in name or "fc_loc" in name:

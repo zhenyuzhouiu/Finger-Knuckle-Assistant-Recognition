@@ -12,7 +12,7 @@
 import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import sys
 from PIL import Image
 import numpy as np
@@ -188,18 +188,18 @@ def genuine_imposter_upright(test_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/01/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/04/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/cosine/MaskLM_RFNet_triplet-lr0.001-r0-a0-2a20-hs0_vs0_11-17-23-32-18/output/01-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.001-r4-a10-2a20-hs4_vs4_11-17-23-21-12/04-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/cosine/MaskLM_RFNet_triplet-lr0.001-r0-a0-2a20-hs0_vs0_11-17-23-32-18/ckpt_epoch_3000.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.001-r4-a10-2a20-hs4_vs4_11-17-23-21-12/ckpt_epoch_1220.pth",
                     dest="model_path")
 parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
-parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
+parser.add_argument("--shift_size", type=int, dest="shift_size", default=4)
 parser.add_argument('--block_size', type=int, dest="block_size", default=8)
-parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=0)
+parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=4)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
 parser.add_argument('--model', type=str, dest='model', default="RFNet")

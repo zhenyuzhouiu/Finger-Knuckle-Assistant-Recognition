@@ -111,9 +111,9 @@ class STN(torch.nn.Module):
             torch.nn.ReLU(True)
         )
         self.fc_loc = torch.nn.Sequential(
-            torch.nn.Linear(input_channels * (input_h / 4 - 2) * (input_w / 4 - 2), input_channels * (input_h / 4 - 2)),
+            torch.nn.Linear(int(input_channels * (input_h / 4 - 2) * (input_w / 4 - 2)), int(input_channels * (input_h / 4 - 2))),
             torch.nn.ReLU(True),
-            torch.nn.Linear(input_channels * (input_h / 4 - 2), input_channels),
+            torch.nn.Linear(int(input_channels * (input_h / 4 - 2)), input_channels),
             torch.nn.ReLU(True),
             torch.nn.Linear(input_channels, 3 * 2)
         )
@@ -123,7 +123,7 @@ class STN(torch.nn.Module):
 
     def forward(self, x):
         xs = self.localization(x)
-        xs = xs.view(-1, self.input_channels * (self.input_h / 4 - 2) * (self.input_w / 4 - 2))
+        xs = xs.view(-1, int(self.input_channels * (self.input_h / 4 - 2) * (self.input_w / 4 - 2)))
         theta = self.fc_loc(xs)
         theta = theta.view(-1, 2, 3)
         grid = F.affine_grid(theta, x.size(), align_corners=True)

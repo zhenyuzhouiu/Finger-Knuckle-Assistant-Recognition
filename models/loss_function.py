@@ -51,6 +51,20 @@ def mse_loss(src, target):
         return ((src - target) ** 2).view(src.size(0), -1).sum(1) / src.nelement() * src.size(0)
 
 
+class CosineSimilarity(torch.nn.Module):
+    def __init__(self):
+        super(CosineSimilarity, self).__init__()
+
+    def forward(self, i_fm1, i_fm2):
+        # b, 1, 32, 32
+        b, c, h, w = i_fm1.shape
+        i_fm1 = i_fm1.contiguous().view(b, -1)
+        i_fm2 = i_fm2.contiguous().view(b, -1)
+        cosim = torch.cosine_similarity(i_fm1, i_fm2, dim=1)
+
+        return cosim
+
+
 class WholeImageRotationAndTranslation(torch.nn.Module):
     """
     The grid_sample is nondeterministic when using CUDA backend

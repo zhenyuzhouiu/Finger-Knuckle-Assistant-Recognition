@@ -3,6 +3,7 @@
 #   Identification using Deep Learning
 # =========================================================
 import os
+
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
@@ -35,7 +36,7 @@ def build_parser():
     parser.add_argument('--n_tuple', type=str, dest='n_tuple',
                         default='triplet', help="how to select the input tuple, triplet, quadruplet, feature")
     # Model
-    parser.add_argument('--model', type=str, dest='model', default="STNWithRFNet")
+    parser.add_argument('--model', type=str, dest='model', default="RFNet")
 
     # Training Strategy
     parser.add_argument('--batch_size', type=int, dest='batch_size', default=3)
@@ -45,13 +46,14 @@ def build_parser():
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
     # Pre-defined Options
-    parser.add_argument('--alpha', type=float, dest='alpha', default=10)
+    parser.add_argument('--alpha', type=float, dest='alpha', default=0.01)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=20, help="the second margin of quadruplet loss")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
     parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=0)
     parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=0)
     parser.add_argument('--block_size', type=int, dest="block_size", default=8)
     parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=0)
+    parser.add_argument('--loss_type', type=str, dest="loss_type", default="cosim")
 
     # fine-tuning
     parser.add_argument('--start_ckpt', type=str, dest='start_ckpt', default="")
@@ -105,8 +107,5 @@ def main():
         model_.triplet_train(args)
 
 
-
-
 if __name__ == "__main__":
     main()
-

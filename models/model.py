@@ -4,6 +4,8 @@ import torch
 from tqdm import tqdm
 import torchvision.utils
 from torch.autograd import Variable
+
+import models.loss_function
 from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel, \
     STNWithRFNet
 from models.loss_function import WholeImageRotationAndTranslation, ImageBlockRotationAndTranslation, \
@@ -141,8 +143,10 @@ class Model(object):
             data = Variable(data, requires_grad=False)
             self.writer.add_graph(inference, [data])
 
-        loss = WholeImageRotationAndTranslation(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
-        logging("Successfully building whole image rotation and translation triplet loss")
+        # loss = WholeImageRotationAndTranslation(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
+        # logging("Successfully building whole image rotation and translation triplet loss")
+        loss = models.loss_function.CosineSimilarity().cuda()
+        logging("Successfully building cosine similarity triplet loss")
         inference.train()
         inference.cuda()
 
@@ -227,7 +231,7 @@ class Model(object):
             self.writer.add_scalar("loss_inference", scalar_value=train_loss,
                                    global_step=((e + 1) * epoch_steps))
 
-            if agg_loss < 66:
+            if agg_loss < 0:
                 freeze_stn = False
 
             train_loss = 0

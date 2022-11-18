@@ -36,6 +36,30 @@ class ResidualBlock(torch.nn.Module):
         return out
 
 
+class ResWithSTNBlock(torch.nn.Module):
+    """ResidualBlock
+    introduced in: https://arxiv.org/abs/1512.03385
+    recommended architecture: http://torch.ch/blog/2016/02/04/resnets.html
+    """
+
+    def __init__(self, channels):
+        super(ResWithSTNBlock, self).__init__()
+        self.stn = STN(input_channels=channels, input_h=32, input_w=32)
+        self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        self.in1 = torch.nn.InstanceNorm2d(channels, affine=True)
+        self.conv2 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        self.in2 = torch.nn.InstanceNorm2d(channels, affine=True)
+        self.relu = torch.nn.ReLU()
+
+    def forward(self, x):
+        residual = x
+        out = self.stn(x)
+        out = self.relu(self.in1(self.conv1(out)))
+        out = self.in2(self.conv2(out))
+        out = out + residual
+        return out
+
+
 class DeConvResBlock(torch.nn.Module):
     def __init__(self, channels):
         super(DeConvResBlock, self).__init__()
@@ -69,6 +93,43 @@ class ConvLayer(torch.nn.Module):
         out = self.reflection_pad(x)
         out = self.conv2d(out)
         return out
+
+
+class STN(torch.nn.Module):
+    def __init__(self, input_channels, input_h, input_w):
+        super(STN, self).__init__()
+        self.input_channels = input_channels
+        self.input_h = input_h
+        self.input_w = input_w
+
+        self.localization = torch.nn.Sequential(
+            torch.nn.Conv2d(input_channels, input_channels, kernel_size=5),
+            torch.nn.MaxPool2d(2, stride=2),
+            torch.nn.ReLU(True),
+            torch.nn.Conv2d(input_channels, input_channels, kernel_size=3),
+            torch.nn.MaxPool2d(2, stride=2),
+            torch.nn.ReLU(True)
+        )
+        self.fc_loc = torch.nn.Sequential(
+            torch.nn.Linear(input_channels * (input_h / 4 - 2) * (input_w / 4 - 2), input_channels * (input_h / 4 - 2)),
+            torch.nn.ReLU(True),
+            torch.nn.Linear(input_channels * (input_h / 4 - 2), input_channels),
+            torch.nn.ReLU(True),
+            torch.nn.Linear(input_channels, 3 * 2)
+        )
+
+        self.fc_loc[4].weight.data.zero_()
+        self.fc_loc[4].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
+
+    def forward(self, x):
+        xs = self.localization(x)
+        xs = xs.view(-1, self.input_channels * (self.input_h / 4 - 2) * (self.input_w / 4 - 2))
+        theta = self.fc_loc(xs)
+        theta = theta.view(-1, 2, 3)
+        grid = F.affine_grid(theta, x.size(), align_corners=True)
+        x = F.grid_sample(x, grid, align_corners=True)
+
+        return x
 
 
 class UpSampleConvLayer(torch.nn.Module):

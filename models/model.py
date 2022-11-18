@@ -54,7 +54,7 @@ class Model(object):
             transforms.ToTensor()
         ])
         train_dataset = Factory(args.train_path, args.feature_path, args.input_size, transform=transform,
-                                valid_ext=['.bmp', '.jpg', '.JPG'], train=True, n_tuple=args.n_tuple)
+                                valid_ext=['.bmp', '.jpg', '.JPG'], train=True, n_tuple=args.n_tuple, if_augment=args.if_augment)
         logging("Successfully Load {} as training dataset...".format(args.train_path))
         train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
 

@@ -18,6 +18,7 @@ import cv2
 from os.path import join, exists
 from PIL import Image
 from torchvision.ops import roi_pool, roi_align
+from data.augmentations import random_perspective, augment_hsv
 
 
 def load_image(path, options='RGB', size=(208, 184)):
@@ -152,7 +153,7 @@ def reminderpick_list(src, list_except=None):
 
 class Factory(torch.utils.data.Dataset):
     def __init__(self, img_path, feature_path, input_size,
-                 transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True, n_tuple="triplet"):
+                 transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True, n_tuple="triplet", if_augment=False):
         self.ext = valid_ext
         self.transform = transform
         self._has_ext = lambda f: True if [e for e in self.ext if e in f] else False
@@ -161,6 +162,7 @@ class Factory(torch.utils.data.Dataset):
         self.train = train
         self.input_size = input_size
         self.n_tuple = n_tuple
+        self.if_augment = if_augment
 
         if not exists(self.folder):
             raise RuntimeError('Dataset not found: {}'.format(self.folder))
@@ -235,9 +237,21 @@ class Factory(torch.utils.data.Dataset):
         # img = []
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L'), -1))
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
-        img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
+        if self.if_augment:
+            src = load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)
+            src = augment_hsv(src)
+            src = random_perspective(src)
+            img = [src]
+        else:
+            img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
         for p in positive:
-            img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
+            if self.if_augment:
+                src = load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size)
+                src = augment_hsv(src)
+                src = random_perspective(src)
+                img.append(src)
+            else:
+                img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
 
         # Negative samples 2 times than positive
         for i in range(2):
@@ -245,7 +259,13 @@ class Factory(torch.utils.data.Dataset):
             list_folders.append(negative_folder)
             negative = reminderpick_list(self.fdict[negative_folder])
             for n in negative:
-                img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
+                if self.if_augment:
+                    src = load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size)
+                    src = augment_hsv(src)
+                    src = random_perspective(src)
+                    img.append(src)
+                else:
+                    img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
 
         # img is the data
         # junk is the label
@@ -256,7 +276,7 @@ class Factory(torch.utils.data.Dataset):
             # to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0]
             # if the PIL Image belongs to one of the modes (L, LA, P, I, F, RGB, YCbCr, RGBA, CMYK, 1)
             # or if the numpy.ndarray has dtype = np.uint8
-            # In the other cases, tensors are returned without scaling.
+            # In the other cases, tensors are returned without normalization.
             img = self.transform(img)
 
         # stride_8.shape:-> [320*3*samples_subject, 32, 32]; stride_8.type:-> tensor

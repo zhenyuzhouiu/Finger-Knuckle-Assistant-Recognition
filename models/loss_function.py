@@ -65,14 +65,15 @@ class CosineSimilarity(torch.nn.Module):
         return cosim
 
 
-class WholeImageRotationAndTranslation(torch.nn.Module):
+class RSIL(torch.nn.Module):
     """
+    Rotation and Shift Invariant Loss Function
     The grid_sample is nondeterministic when using CUDA backend
     So I recommend to use CPU
     """
 
     def __init__(self, i_v_shift, i_h_shift, i_angle, ):
-        super(WholeImageRotationAndTranslation, self).__init__()
+        super(RSIL, self).__init__()
         self.v_shift = i_v_shift
         self.h_shift = i_h_shift
         self.angle = i_angle

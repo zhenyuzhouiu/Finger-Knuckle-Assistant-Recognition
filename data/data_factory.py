@@ -14,11 +14,14 @@ import os
 import numpy as np
 import torch
 import cv2
+import matplotlib.pyplot as plt
 
 from os.path import join, exists
 from PIL import Image
 from torchvision.ops import roi_pool, roi_align
 from data.augmentations import random_perspective, augment_hsv
+from torchvision import transforms
+from torch.utils.data import DataLoader
 
 
 def load_image(path, options='RGB', size=(208, 184)):
@@ -239,8 +242,15 @@ class Factory(torch.utils.data.Dataset):
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
         if self.if_augment:
             src = load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)
+            # plt.subplot(1, 2, 1)
+            # plt.title('src_image')
+            # plt.imshow(src)
             src = augment_hsv(src)
             src = random_perspective(src)
+            # plt.subplot(1, 2, 2)
+            # plt.title('augmentation')
+            # plt.imshow(src)
+            # plt.show()
             img = [src]
         else:
             img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
@@ -392,5 +402,13 @@ class Factory(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    feature_path = r"C:\Users\ZhenyuZHOU\Desktop\YOLOv5-Assistant-Feature\inference\feature\test\knuckle-00135-0-8.npy"
-    pooled_8 = load_feature_8(feature_path)
+    train_path = '/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/03/'
+    feature_path = '/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/feature/03/'
+    transform = transforms.Compose([
+        transforms.ToTensor()
+    ])
+    dataset = Factory(train_path, feature_path, (128, 128), transform=transform,
+                      valid_ext=['.bmp', '.jpg', '.JPG'], train=True, n_tuple='triplet', if_augment=True)
+    dataloader = DataLoader(dataset=dataset, batch_size=1, shuffle=True)
+    for i, (x, _) in enumerate(dataloader):
+        print(i)

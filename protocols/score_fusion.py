@@ -15,11 +15,12 @@ color = ['#ff0000',
 
 cls = ["01", "02", "03", "07", "08", "09"]
 
-fk_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/score/fk_score/"
-fp_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/score/fp_score/"
-dynamic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/score/dynamic/"
-holistic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/score/holistic/"
-nonlinear_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle4-a20-hs4_vs4_2022-11-02-22-47/output/score/nonlinear-y2-c1/"
+fk_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fk_score/"
+fp_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fp_score/"
+dynamic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/dynamic/"
+holistic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/holistic/"
+nonlinear_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/nonlinear/"
+
 
 def get_score(matching_matrix):
     feats_length = []
@@ -53,7 +54,9 @@ def get_score(matching_matrix):
             i_scores += list(matching_matrix[i, i_select])
     return g_scores, i_scores
 
+
 def draw_roc(scores, save_path):
+    l_eer = []
     for i in range(len(scores)):
         score = scores[i]
         g_scores = np.array(score[0])
@@ -62,7 +65,7 @@ def draw_roc(scores, save_path):
         x, y = calc_coordinates(g_scores, i_scores)
         print("[*] EER: {}".format(calc_eer(x, y)))
         EER = "%.3f%%" % (calc_eer(x, y) * 100)
-
+        l_eer.append(calc_eer(x, y) * 100)
         lines = plt.plot(x, y, label='ROC')
         plt.setp(lines, 'color', color[i], 'linewidth', 3, 'label', label[i] + "; EER: " + str(EER))
 
@@ -92,13 +95,21 @@ def draw_roc(scores, save_path):
 
     plt.savefig(save_path, bbox_inches='tight')
     plt.close()
+    return l_eer
+
 
 for c in cls:
-    fk_score_file = os.path.join(fk_score_path, "fk_score_"+c+".npy")
-    fp_score_file = os.path.join(fp_score_path, "fp_score_"+c+".csv")
-    dynamic_save_file = os.path.join(dynamic_save_path, c+".pdf")
-    holistic_save_file = os.path.join(holistic_save_path, c+".pdf")
-    nonlinear_save_file = os.path.join(nonlinear_save_path, c+'.pdf')
+    fk_score_file = os.path.join(fk_score_path, "fk_score_" + c + ".npy")
+    fp_score_file = os.path.join(fp_score_path, "fp_score_" + c + ".csv")
+    # dynamic_save_subject = os.path.join(dynamic_save_path, c)
+    # if not os.path.exists(dynamic_save_subject):
+    #     os.mkdir(dynamic_save_subject)
+    # holistic_save_subject = os.path.join(holistic_save_path, c)
+    # if not os.path.exists(holistic_save_subject):
+    #     os.mkdir(holistic_save_subject)
+    nonlinear_save_subject = os.path.join(nonlinear_save_path, c)
+    if not os.path.exists(nonlinear_save_subject):
+        os.mkdir(nonlinear_save_subject)
 
     fk_score = np.load(fk_score_file, allow_pickle=True)[()]
     fk_matrix = np.array(fk_score['mmat'])
@@ -121,20 +132,46 @@ for c in cls:
     fk_g_scores, fk_i_scores = get_score(fk_matrix)
     fp_g_scores, fp_i_scores = get_score(fp_matrix)
 
-    # dynamic_matrix = 0.5*fk_matrix + 0.5*fp_matrix
-    # dynamic_g, dynamic_i = get_score(dynamic_matrix)
-    # draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [dynamic_g, dynamic_i]],
-    #          save_path=dynamic_save_file)
+    # eer = []
+    # for w in range(0, 100, 5):
+    #     w = w / 100
+    #     w2 = 1 - w
+    #     dynamic_matrix = w * fk_matrix + w2 * fp_matrix
+    #     dynamic_g, dynamic_i = get_score(dynamic_matrix)
+    #     dynamic_save_file = os.path.join(dynamic_save_subject, str(w) + '-' + str(1 - w) + '.pdf')
+    #     l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [dynamic_g, dynamic_i]],
+    #                      save_path=dynamic_save_file)
+    #     eer.append(l_eer[2])
     #
-    # holistic_matrix = (0.5*fk_matrix + 0.5*fp_matrix) * (1 + 1 / (2 - fk_matrix))
-    # holistic_g, holistic_i = get_score(holistic_matrix)
-    # draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [holistic_g, holistic_i]],
-    #          save_path=holistic_save_file)
+    # eer = np.array(eer).astype(np.float)
+    # min_eer = np.min(eer)
+    # min_index = np.where(eer == min_eer)
+    # print("For the cls "+str(c)+": min err value: "+str(min_eer)+" min eer value index: "+str(min_index)+'\n')
+    #
 
-    nonlinear_matrix = np.power((1 + fp_matrix)/(1+fk_matrix), 2) * np.power((1+fk_matrix), 2)
-    nonlinear_g, nonlinear_i = get_score(nonlinear_matrix)
-    draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [nonlinear_g, nonlinear_i]],
-             save_path=nonlinear_save_file)
+    eer = []
+    for w in range(0, 100, 5):
+        w = (w / 100) + 1
+        w2 = 1 - w
+        # holistic_save_file = os.path.join(holistic_save_subject, str(w) + '-' + str(1 - w) + '.pdf')
+        # holistic_matrix = (w*fk_matrix + w2*fp_matrix) * (1 + 1 / (2 - fp_matrix))
+        # holistic_g, holistic_i = get_score(holistic_matrix)
+        # l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [holistic_g, holistic_i]],
+        #          save_path=holistic_save_file)
+
+        nonlinear_save_file = os.path.join(nonlinear_save_subject, str(w) + '.pdf')
+        nonlinear_matrix = np.power((1 + fk_matrix) / (1 + fp_matrix), w) * np.power((1 + fp_matrix), 2)
+        nonlinear_g, nonlinear_i = get_score(nonlinear_matrix)
+        l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [nonlinear_g, nonlinear_i]],
+                 save_path=nonlinear_save_file)
+
+        eer.append(l_eer[2])
+
+    eer = np.array(eer).astype(np.float)
+    min_eer = np.min(eer)
+    min_index = np.where(eer == min_eer)
+    print("For the cls "+str(c)+": min err value: "+str(min_eer)+" min eer value index: "+str(min_index)+'\n')
+
 
 
 

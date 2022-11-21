@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
+import matplotlib.pyplot as plt
 
 
 def augment_hsv(im, hgain=0.015, sgain=0.7, vgain=0.4):
@@ -44,7 +45,7 @@ def hist_equalize(im, clahe=True, bgr=False):
 
 
 def random_perspective(im,
-                       degrees=10,
+                       degrees=5,
                        translate=.1,
                        scale=.1,
                        shear=0,
@@ -88,9 +89,9 @@ def random_perspective(im,
     M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
     if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
         if perspective:
-            im = cv2.warpPerspective(im, M, dsize=(width, height), borderValue=(114, 114, 114))
+            im = cv2.warpPerspective(im, M, dsize=(width, height), borderValue=(0, 0, 0))
         else:  # affine
-            im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=(114, 114, 114))
+            im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=(0, 0, 0))
 
     # Visualize
     # import matplotlib.pyplot as plt
@@ -117,3 +118,14 @@ class ToTensor:
 
 if __name__ == "__main__":
     print("Data Augmentation Algorithms!")
+    for i in range(100):
+        src = cv2.imread("/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/03/100/100-03-1.jpg")
+        img = random_perspective(src)
+        plt.subplot(1,2,1)
+        src = cv2.cvtColor(src, cv2.COLOR_BGR2RGB)
+        plt.imshow(src)
+        plt.subplot(1,2,2)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        plt.imshow(img)
+        plt.show()
+

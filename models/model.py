@@ -54,7 +54,8 @@ class Model(object):
             transforms.ToTensor()
         ])
         train_dataset = Factory(args.train_path, args.feature_path, args.input_size, transform=transform,
-                                valid_ext=['.bmp', '.jpg', '.JPG'], train=True, n_tuple=args.n_tuple, if_augment=args.if_augment)
+                                valid_ext=['.bmp', '.jpg', '.JPG'], train=True, n_tuple=args.n_tuple,
+                                if_augment=args.if_augment)
         logging("Successfully Load {} as training dataset...".format(args.train_path))
         train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
 
@@ -79,15 +80,8 @@ class Model(object):
             example_anchor = example_data[:, 0:3, :, :]
             example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
                                                                                          example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1,
-                                                                                                                    3,
-                                                                                                                    example_anchor.size(
-                                                                                                                        2),
-                                                                                                                    example_anchor.size(
-                                                                                                                        3))
-            example_negative2 = example_data[:, 3 * 3 * self.samples_subject:, :, :].reshape(-1, 3,
-                                                                                             example_anchor.size(2),
-                                                                                             example_anchor.size(3))
+            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
+            example_negative2 = example_data[:, 3 * 3 * self.samples_subject:, :, :].reshape(-1, 3,example_anchor.size(2), example_anchor.size(3))
             anchor_grid = torchvision.utils.make_grid(example_anchor)
             self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
             positive_grid = torchvision.utils.make_grid(example_positive)
@@ -102,12 +96,7 @@ class Model(object):
             example_anchor = example_data[:, 0:3, :, :]
             example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
                                                                                          example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1,
-                                                                                                                    3,
-                                                                                                                    example_anchor.size(
-                                                                                                                        2),
-                                                                                                                    example_anchor.size(
-                                                                                                                        3))
+            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1,3,example_anchor.size(2),example_anchor.size(3))
             anchor_grid = torchvision.utils.make_grid(example_anchor)
             self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
             positive_grid = torchvision.utils.make_grid(example_positive)
@@ -124,11 +113,11 @@ class Model(object):
 
     def _build_model(self, args):
         if args.model not in ["RFNet", "DeConvRFNet", "FKEfficientNet",
-                              "RFNWithSTNet", "ConvNet", "FusionNet", "AssistantModel", "STNWithRFNet", "ResidualSTNet"]:
+                              "RFNWithSTNet", "ConvNet", "FusionNet", "AssistantModel", "STNWithRFNet",
+                              "ResidualSTNet"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         if args.model in ["FusionNet", "AssistantModel"]:
-            inference = model_dict[args.model].cuda().eval()
             data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
             data = Variable(data, requires_grad=False)
             s32 = torch.randn([1280, 8, 8]).unsqueeze(0).cuda()
@@ -139,13 +128,16 @@ class Model(object):
             s8 = Variable(s8, requires_grad=False)
             self.writer.add_graph(inference, [data, s8, s16, s32])
         else:
-            inference = model_dict[args.model].cuda().eval()
             data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
             data = Variable(data, requires_grad=False)
             self.writer.add_graph(inference, [data])
 
-        loss = WholeImageRotationAndTranslation(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
-        logging("Successfully building whole image rotation and translation triplet loss")
+        if args.loss_type == "rsil":
+            loss = WholeImageRotationAndTranslation(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
+            logging("Successfully building whole image rotation and translation triplet loss")
+        else:
+            raise RuntimeError('Please make sure your loss funtion!')
+
         # loss = models.loss_function.CosineSimilarity().cuda()
         # logging("Successfully building cosine similarity triplet loss")
         inference.train()
@@ -166,7 +158,7 @@ class Model(object):
         # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
         scheduler = MultiStepLR(self.optimizer, milestones=[10, 500, 1000], gamma=0.1)
         # for freeze spatial transformer network
-        freeze_stn = False
+        freeze_stn = args.freeze_stn
 
         for e in range(start_epoch, args.epochs + start_epoch):
             # self.exp_lr_scheduler(e, lr_decay_epoch=100)
@@ -232,7 +224,7 @@ class Model(object):
             self.writer.add_scalar("loss_inference", scalar_value=train_loss,
                                    global_step=((e + 1) * epoch_steps))
 
-            if agg_loss < 0:
+            if agg_loss <= args.freeze_thre:
                 freeze_stn = False
 
             train_loss = 0

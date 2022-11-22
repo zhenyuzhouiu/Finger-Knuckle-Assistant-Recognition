@@ -8,7 +8,7 @@ from torch.autograd import Variable
 import models.loss_function
 from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel, \
     STNWithRFNet, ResidualSTNet
-from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance
+from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
 from torchvision import transforms
 import torchvision
 from torch.utils.data import DataLoader
@@ -133,7 +133,10 @@ class Model(object):
 
         if args.loss_type == "rsil":
             loss = RSIL(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
-            logging("Successfully building whole image rotation and translation triplet loss")
+            logging("Successfully building rsil triplet loss")
+        elif args.loss_type == "maskrsil":
+            loss = MaskRSIL(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
+            logging("Successfully building mask rsil triplet loss")
         else:
             raise RuntimeError('Please make sure your loss funtion!')
 
@@ -198,8 +201,11 @@ class Model(object):
                 neg_mask = mask[:, self.samples_subject:, :, :].contiguous()
                 nneg = neg_fm.size(1)
                 neg_fm = neg_fm.view(-1, 1, neg_fm.size(2), neg_fm.size(3))
+                neg_mask = neg_mask.view(-1, 1, neg_mask.size(2), neg_fm.size(3))
                 an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
-                                    neg_fm)
+                                    anchor_mask.repeat(1, nneg, 1, 1).view(-1, 1, anchor_mask.size(2), anchor_mask.size(3)),
+                                    neg_fm,
+                                    neg_mask)
                 # an_loss.shape:-> (batch_size, 10)
                 # min(1) will get min value and the corresponding indices
                 # min(1)[0]
@@ -207,8 +213,11 @@ class Model(object):
 
                 npos = pos_fm.size(1)
                 pos_fm = pos_fm.view(-1, 1, pos_fm.size(2), pos_fm.size(3))
+                pos_mask = pos_mask.view(-1, 1, pos_mask.size(2), pos_mask.size(3))
                 ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
-                                    pos_fm)
+                                    anchor_mask.repeat(1, npos, 1, 1).view(-1, 1, anchor_mask.size(2), anchor_mask.size(3)),
+                                    pos_fm,
+                                    pos_mask)
                 ap_loss = ap_loss.view((-1, npos)).max(1)[0]
 
                 sstl = ap_loss - an_loss + args.alpha

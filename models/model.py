@@ -8,8 +8,7 @@ from torch.autograd import Variable
 import models.loss_function
 from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel, \
     STNWithRFNet, ResidualSTNet
-from models.loss_function import WholeImageRotationAndTranslation, ImageBlockRotationAndTranslation, \
-    ShiftedLoss, MSELoss, HammingDistance
+from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance
 from torchvision import transforms
 import torchvision
 from torch.utils.data import DataLoader
@@ -61,7 +60,7 @@ class Model(object):
 
         if args.n_tuple in ['triplet']:
             examples = iter(train_loader)
-            example_data, example_target = examples.next()
+            example_data, example_mask, example_target = examples.next()
             example_anchor = example_data[:, 0:3, :, :]
             example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
                                                                                          example_anchor.size(3))
@@ -133,7 +132,7 @@ class Model(object):
             self.writer.add_graph(inference, [data])
 
         if args.loss_type == "rsil":
-            loss = WholeImageRotationAndTranslation(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
+            loss = RSIL(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
             logging("Successfully building whole image rotation and translation triplet loss")
         else:
             raise RuntimeError('Please make sure your loss funtion!')
@@ -167,7 +166,7 @@ class Model(object):
             # for batch_id, (x, _) in enumerate(self.train_loader):
             # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
             loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
-            for batch_id, (x, _) in loop:
+            for batch_id, (x, mask, _) in loop:
                 if args.model in ["RFNWithSTNet", "STNWithRFNet", "ResidualSTNet"]:
                     if freeze_stn:
                         for name, para in self.inference.named_parameters():
@@ -178,18 +177,25 @@ class Model(object):
                             if "localization" in name or "fc_loc" in name:
                                 para.requires_grad_(True)
 
-                # ================================================:======== train inference model
+                # ========================================================= train inference model
                 # x.shape :-> [b, 3*3*samples_subject, h, w]
-                # y.shape:
+                # mask.shape :-> [b, 3*samples_subject, h, w]
                 x = x.cuda()
                 x = Variable(x, requires_grad=False)
-                fms = self.inference(x.view(-1, 3, x.size(2), x.size(3)))
+                mask = mask.cuda()
+                mask = Variable(mask, requires_grad=False)
+                fms, mask = self.inference(x.view(-1, 3, x.size(2), x.size(3)),
+                                           mask.view(-1, 1, mask.size(2), mask.size(3)))
                 # (batch_size, anchor+positive+negative, 32, 32)
                 fms = fms.view(x.size(0), -1, fms.size(2), fms.size(3))
+                mask = mask.view(x.size(0), -1, mask.size(2), mask.size(3))
 
                 anchor_fm = fms[:, 0, :, :].unsqueeze(1)  # anchor has one sample
+                anchor_mask = mask[:, 1, :, :].unsqueeze(1)
                 pos_fm = fms[:, 1:self.samples_subject, :, :].contiguous()
+                pos_mask = mask[:, 1:self.samples_subject, :, :].contiguous()
                 neg_fm = fms[:, self.samples_subject:, :, :].contiguous()
+                neg_mask = mask[:, self.samples_subject:, :, :].contiguous()
                 nneg = neg_fm.size(1)
                 neg_fm = neg_fm.view(-1, 1, neg_fm.size(2), neg_fm.size(3))
                 an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),

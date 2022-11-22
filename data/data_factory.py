@@ -163,6 +163,7 @@ class Factory(torch.utils.data.Dataset):
         self.folder = img_path
         self.feature_folder = feature_path
         self.train = train
+        # input_size:-> (w, h)
         self.input_size = input_size
         self.n_tuple = n_tuple
         self.if_augment = if_augment
@@ -242,26 +243,26 @@ class Factory(torch.utils.data.Dataset):
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
         if self.if_augment:
             src = load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)
-            # plt.subplot(1, 2, 1)
-            # plt.title('src_image')
-            # plt.imshow(src)
             src = augment_hsv(src)
-            src = random_perspective(src)
-            # plt.subplot(1, 2, 2)
-            # plt.title('augmentation')
-            # plt.imshow(src)
-            # plt.show()
+            src, ma = random_perspective(src)
             img = [src]
+            mask = [ma]
         else:
             img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
+            # self.input_size:-> (w, h)
+            ma = np.ones((int(self.input_size[1] / 4), int(self.input_size[0] / 4), 1), dtype=img[0].dtype)
+            mask = [ma]
         for p in positive:
             if self.if_augment:
                 src = load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size)
                 src = augment_hsv(src)
-                src = random_perspective(src)
+                src, ma = random_perspective(src)
                 img.append(src)
+                mask.append(ma)
             else:
                 img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
+                ma = np.ones((int(self.input_size[1] / 4), int(self.input_size[0] / 4), 1), dtype=img[0].dtype)
+                mask.append(ma)
 
         # Negative samples 2 times than positive
         for i in range(2):
@@ -272,10 +273,13 @@ class Factory(torch.utils.data.Dataset):
                 if self.if_augment:
                     src = load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size)
                     src = augment_hsv(src)
-                    src = random_perspective(src)
+                    src, ma = random_perspective(src)
                     img.append(src)
+                    mask.append(ma)
                 else:
                     img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
+                    ma = np.ones((int(self.input_size[1] / 4), int(self.input_size[0] / 4), 1), dtype=img[0].dtype)
+                    mask.append(ma)
 
         # img is the data
         # junk is the label
@@ -288,11 +292,9 @@ class Factory(torch.utils.data.Dataset):
             # or if the numpy.ndarray has dtype = np.uint8
             # In the other cases, tensors are returned without normalization.
             img = self.transform(img)
+            mask = self.transform(mask)
 
-        # stride_8.shape:-> [320*3*samples_subject, 32, 32]; stride_8.type:-> tensor
-        # stride_16.shape:-> [640*3*samples_subject, 16, 16]
-        # stride_32.shape:-> [1280*3*samples_subject, 8, 8]
-        return img, junk
+        return img, mask, junk
 
     def _feature_trainitems(self, index):
         # ======================= get images and corresponding features and label

@@ -40,7 +40,7 @@ class ResidualFeatureNet(torch.nn.Module):
         self.conv4 = ConvLayer(128, 64, kernel_size=3, stride=1)
         self.conv5 = ConvLayer(64, 1, kernel_size=1, stride=1)
 
-    def forward(self, x):
+    def forward(self, x, mask):
         conv1 = F.relu(self.conv1(x))
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))
@@ -53,7 +53,7 @@ class ResidualFeatureNet(torch.nn.Module):
         # conv5 = F.sigmoid(self.conv5(conv4))
         conv5 = F.relu(self.conv5(conv4))
 
-        return conv5
+        return conv5, mask
 
 
 class ResidualSTNet(torch.nn.Module):
@@ -74,7 +74,7 @@ class ResidualSTNet(torch.nn.Module):
         self.conv4 = ConvLayer(128, 64, kernel_size=3, stride=1)
         self.conv5 = ConvLayer(64, 1, kernel_size=1, stride=1)
 
-    def forward(self, x):
+    def forward(self, x, mask):
         conv1 = F.relu(self.conv1(x))
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))
@@ -219,17 +219,18 @@ class RFNWithSTNet(torch.nn.Module):
         self.fc_loc[2].weight.data.zero_()
         self.fc_loc[2].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
 
-    def stn(self, x):
+    def stn(self, x, mask):
         xs = self.localization(x)
         xs = xs.view(-1, 32 * 6 * 6)
         theta = self.fc_loc(xs)
         theta = theta.view(-1, 2, 3)
         grid = F.affine_grid(theta, x.size(), align_corners=True)
         x = F.grid_sample(x, grid, align_corners=True)
+        mask = F.grid_sample(mask, grid, align_corners=True)
 
-        return x
+        return x, mask
 
-    def forward(self, x):
+    def forward(self, x, mask):
         # conv1 = F.relu(self.bn1(self.conv1(x)))
         # conv2 = F.relu(self.bn2(self.conv2(conv1)))
         # conv3 = F.relu(self.bn3(self.conv3(conv2)))
@@ -250,9 +251,9 @@ class RFNWithSTNet(torch.nn.Module):
         conv4 = F.relu(self.conv4(resid4))
         conv5 = F.relu(self.conv5(conv4))
 
-        out = self.stn(conv5)
+        out, mask = self.stn(conv5, mask)
 
-        return out
+        return out, mask
 
 
 class STNWithRFNet(torch.nn.Module):
@@ -307,7 +308,7 @@ class STNWithRFNet(torch.nn.Module):
         self.fc_loc[4].weight.data.zero_()
         self.fc_loc[4].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
 
-    def stn(self, x):
+    def stn(self, x, mask):
         xs = self.localization(x)
         xs = xs.view(-1, 32 * 30 * 30)
         theta = self.fc_loc(xs)
@@ -315,10 +316,14 @@ class STNWithRFNet(torch.nn.Module):
         grid = F.affine_grid(theta, x.size(), align_corners=True)
         x = F.grid_sample(x, grid, align_corners=True)
 
-        return x
+        grid = F.affine_grid(theta, mask.size(), align_corners=True)
+        mask = F.grid_sample(mask, grid, align_corners=True)
 
-    def forward(self, x):
-        x = self.stn(x)
+
+        return x, mask
+
+    def forward(self, x, mask):
+        x, mask = self.stn(x, mask)
         # conv1 = F.relu(self.bn1(self.conv1(x)))
         # conv2 = F.relu(self.bn2(self.conv2(conv1)))
         # conv3 = F.relu(self.bn3(self.conv3(conv2)))
@@ -339,7 +344,7 @@ class STNWithRFNet(torch.nn.Module):
         conv4 = F.relu(self.conv4(resid4))
         conv5 = F.relu(self.conv5(conv4))
 
-        return conv5
+        return conv5, mask
 
 
 class AssistantModel(torch.nn.Module):

@@ -51,11 +51,18 @@ def random_perspective(im,
                        shear=0,
                        perspective=0.0,
                        border=(0, 0)):
+    """
+    output:->
+    ======== im, mask
+    """
     # torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 10))
     # targets = [cls, xyxy]
 
     height = im.shape[0] + border[0] * 2  # shape(h,w,c)
     width = im.shape[1] + border[1] * 2
+    # the RFN net will down sample image by 4
+    # mask.shape:-> (32, 32, 1)
+    mask = np.ones((int(height/4), int(width/4), 1), dtype=im.dtype)
 
     # Center
     C = np.eye(3)
@@ -90,16 +97,14 @@ def random_perspective(im,
     if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
         if perspective:
             im = cv2.warpPerspective(im, M, dsize=(width, height), borderValue=(0, 0, 0))
+            mask = cv2.warpPerspective(mask, M, dsize=(int(width/4), int(height/4)), borderValue=(0, 0, 0))
         else:  # affine
             im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=(0, 0, 0))
+            mask = cv2.warpAffine(mask, M[:2], dsize=(int(width/4), int(height/4)), borderValue=(0, 0, 0))
 
-    # Visualize
-    # import matplotlib.pyplot as plt
-    # ax = plt.subplots(1, 2, figsize=(12, 6))[1].ravel()
-    # ax[0].imshow(im[:, :, ::-1])  # base
-    # ax[1].imshow(im2[:, :, ::-1])  # warped
-
-    return im
+    # im.shape:-> [h, w, 3]
+    # mask.shape:-> [h/4, w/4, 1]
+    return im, mask
 
 
 class ToTensor:

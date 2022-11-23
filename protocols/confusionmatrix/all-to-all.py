@@ -45,6 +45,7 @@ def calc_feats_more(*paths, size=(208, 184)):
     w, h = size[0], size[1]
     ratio = size[1] / size[0]
     container = np.zeros((len(paths), 3, h, w))
+    mask = np.zeros((len(paths), 1, int(h/4), int(w/4)))
     for i, path in enumerate(paths):
         image = np.array(
             Image.open(path).convert('RGB'),
@@ -70,16 +71,20 @@ def calc_feats_more(*paths, size=(208, 184)):
         # change hxwxc = cxhxw
         im = np.transpose(resize_image, (2, 0, 1))
         container[i, :, :, :] = im
+        ma = np.ones([1, int(size[1]/4), int(size[0]/4)])
+        mask[i, :, :, :] = ma
     container /= 255.
     container = torch.from_numpy(container.astype(np.float32))
     container = container.cuda()
     container = Variable(container, requires_grad=False)
-    fv = inference(container)
+    mask = torch.from_numpy(mask.astype(np.float32))
+    mask = mask.cuda()
+    mask = Variable(mask, requires_grad=False)
+    fv, mask = inference(container, mask)
     # traced_script_module = torch.jit.trace(inference, container)
     # traced_script_module.save("traced_450.pt")
 
-    return fv.cpu().data.numpy()
-
+    return fv.cpu().data.numpy(), mask.cpu().data.numpy()
 
 def genuine_imposter(test_path):
     subs = subfolders(test_path, preserve_prefix=True)
@@ -134,6 +139,7 @@ def genuine_imposter_upright(test_path):
     subs = subfolders(test_path, preserve_prefix=True)
     subs.sort()
     feats_all = []
+    mask_all = []
     feats_length = []
     nfeats = 0
     for i, usr in enumerate(subs):
@@ -141,15 +147,18 @@ def genuine_imposter_upright(test_path):
         subims.sort()
         nfeats += len(subims)
         feats_length.append(len(subims))
-        feats_all.append(calc_feats_more(*subims))
+        fm, ma = calc_feats_more(*subims)
+        feats_all.append(fm)
+        mask_all.append(ma)
     feats_length = np.array(feats_length)
     acc_len = np.cumsum(feats_length)
     feats_start = acc_len - feats_length
 
     feats_all = torch.from_numpy(np.concatenate(feats_all, 0)).cuda()
+    mask_all = torch.from_numpy(np.concatenate(mask_all, 0)).cuda()
     matching_matrix = np.ones((nfeats, nfeats)) * 1e5
     for i in range(1, feats_all.size(0)):
-        loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :])
+        loss = _loss(feats_all[:-i, :, :, :], mask_all[:-i, :, :, :], feats_all[i:, :, :, :], mask_all[i:, :, :, :])
         matching_matrix[:-i, i] = loss
         print("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
 
@@ -188,13 +197,13 @@ def genuine_imposter_upright(test_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/04/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/01/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.001-r0-a10-2a20-hs0_vs0_11-19-11-12-51/output/04-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.0001-r0-a10-2a20-hs0_vs0_11-23-14-20-55/output/01-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.001-r0-a10-2a20-hs0_vs0_11-19-11-12-51/ckpt_epoch_1580.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.0001-r0-a10-2a20-hs0_vs0_11-23-14-20-55/ckpt_epoch_3040.pth",
                     dest="model_path")
 parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
 parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
@@ -219,15 +228,15 @@ inference = model_dict[args.model].cuda()
 
 inference.load_state_dict(torch.load(args.model_path))
 # Loss = models.loss_function.WholeRotationShiftedLoss(args.shift_size, args.shift_size, args.angle)
-Loss = models.loss_function.WholeImageRotationAndTranslation(args.shift_size, args.shift_size, args.rotate_angle)
+Loss = models.loss_function.MaskRSIL(args.shift_size, args.shift_size, args.rotate_angle)
 # Loss = models.loss_function.ImageBlockRotationAndTranslation(args.block_size, args.shift_size, args.shift_size,
 #                                                              args.rotate_angle, args.top_k)
 Loss.cuda()
 Loss.eval()
 
 
-def _loss(feats1, feats2):
-    loss = Loss(feats1, feats2)
+def _loss(feats1, mask1, feats2, mask2):
+    loss = Loss(feats1, mask1, feats2, mask2)
     if isinstance(loss, torch.autograd.Variable):
         loss = loss.data
     return loss.cpu().numpy()

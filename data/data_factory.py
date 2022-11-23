@@ -250,7 +250,7 @@ class Factory(torch.utils.data.Dataset):
         else:
             img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
             # self.input_size:-> (w, h)
-            ma = np.ones((int(self.input_size[1] / 4), int(self.input_size[0] / 4), 1), dtype=img[0].dtype)
+            ma = np.ones((1, int(self.input_size[1] / 4), int(self.input_size[0] / 4)), dtype=img[0].dtype)
             mask = [ma]
         for p in positive:
             if self.if_augment:
@@ -261,7 +261,7 @@ class Factory(torch.utils.data.Dataset):
                 mask.append(ma)
             else:
                 img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
-                ma = np.ones((int(self.input_size[1] / 4), int(self.input_size[0] / 4), 1), dtype=img[0].dtype)
+                ma = np.ones((1, int(self.input_size[1] / 4), int(self.input_size[0] / 4)), dtype=img[0].dtype)
                 mask.append(ma)
 
         # Negative samples 2 times than positive
@@ -278,7 +278,7 @@ class Factory(torch.utils.data.Dataset):
                     mask.append(ma)
                 else:
                     img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
-                    ma = np.ones((int(self.input_size[1] / 4), int(self.input_size[0] / 4), 1), dtype=img[0].dtype)
+                    ma = np.ones((1, int(self.input_size[1] / 4), int(self.input_size[0] / 4)), dtype=img[0].dtype)
                     mask.append(ma)
 
         # img is the data
@@ -292,7 +292,9 @@ class Factory(torch.utils.data.Dataset):
             # or if the numpy.ndarray has dtype = np.uint8
             # In the other cases, tensors are returned without normalization.
             img = self.transform(img)
-            mask = self.transform(mask)
+
+        mask = np.concatenate(mask, axis=0)
+        mask = (torch.from_numpy(mask)).type(img.dtype)
 
         return img, mask, junk
 

@@ -47,7 +47,7 @@ def rotate_mse_loss(i_fm1, i_mask1, i_fm2, i_mask2):
     mask = torch.mul(i_mask1, i_mask2)
     # only calculate pixel-to-pixel MSE on the common region
     square_err = torch.mul(torch.pow((i_fm1 - i_fm2), 2), mask)
-    mean_se = square_err.view(i_fm1.size(0), -1).sum(1) / mask.view(i_fm1.size(0), -1).sum(1)
+    mean_se = square_err.view(i_fm1.size(0), -1).sum(1) / (mask.view(i_fm1.size(0), -1).sum(1) + 0.00000000001)
     return mean_se
 
 
@@ -135,9 +135,9 @@ class MaskRSIL(torch.nn.Module):
     """
     def __init__(self, i_v_shift, i_h_shift, i_angle):
         super(MaskRSIL, self).__init__()
-        self.v_shift = int(i_v_shift/2)
-        self.h_shift = int(i_h_shift/2)
-        self.angle = int(i_angle/2)
+        self.v_shift = i_v_shift
+        self.h_shift = i_h_shift
+        self.angle = i_angle
 
     def forward(self, i_fm1, i_mask1, i_fm2, i_mask2, i_min_or_max="min"):
         b, c, h, w = i_fm1.shape
@@ -148,19 +148,20 @@ class MaskRSIL(torch.nn.Module):
             min_dist = torch.zeros([b, ], dtype=i_fm1.dtype, requires_grad=False, device=i_fm1.device)
 
         if self.v_shift == self.h_shift == self.angle == 0:
-            min_dist = mse_loss(i_fm1, i_fm2).cuda()
+            # min_dist = mse_loss(i_fm1, i_fm2).cuda()
+            min_dist = rotate_mse_loss(i_fm1, i_mask1, i_fm2, i_mask2)
             return min_dist
         for tx in range(-self.h_shift, self.h_shift + 1):
             for ty in range(-self.v_shift, self.v_shift + 1):
                 for a in range(-self.angle, self.angle + 1):
                     # transform i_fm1
-                    radian_a = -(a * math.pi / 180.)
-                    ratio_tx = -(2 * tx / w)
-                    ratio_ty = -(2 * ty / h)
-                    theta = generate_theta(radian_a, ratio_tx, ratio_ty, b, h, w, i_fm1.dtype).to(i_fm1.device)
-                    grid = F.affine_grid(theta, i_fm1.size(), align_corners=False).to(i_fm1.device)
-                    r_fm1 = F.grid_sample(i_fm1, grid, align_corners=False)
-                    r_mask1 = F.grid_sample(i_mask1, grid, align_corners=False)
+                    # radian_a = -(a * math.pi / 180.)
+                    # ratio_tx = -(2 * tx / w)
+                    # ratio_ty = -(2 * ty / h)
+                    # theta = generate_theta(radian_a, ratio_tx, ratio_ty, b, h, w, i_fm1.dtype).to(i_fm1.device)
+                    # grid = F.affine_grid(theta, i_fm1.size(), align_corners=False).to(i_fm1.device)
+                    # r_fm1 = F.grid_sample(i_fm1, grid, align_corners=False)
+                    # r_mask1 = F.grid_sample(i_mask1, grid, align_corners=False)
                     # transform i_fm2
                     radian_a = a * math.pi / 180.
                     ratio_tx = 2 * tx / w
@@ -170,7 +171,7 @@ class MaskRSIL(torch.nn.Module):
                     r_fm2 = F.grid_sample(i_fm2, grid, align_corners=False)
                     r_mask2 = F.grid_sample(i_mask2, grid, align_corners=False)
                     # mean_se.shape: -> (bs, )
-                    mean_se = rotate_mse_loss(r_fm1, r_mask1, r_fm2, r_mask2)
+                    mean_se = rotate_mse_loss(i_fm1, i_mask1, r_fm2, r_mask2)
                     if n_affine == 0:
                         min_dist = mean_se
                     else:

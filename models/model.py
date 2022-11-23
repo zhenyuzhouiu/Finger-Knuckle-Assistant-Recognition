@@ -129,7 +129,8 @@ class Model(object):
         else:
             data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
             data = Variable(data, requires_grad=False)
-            self.writer.add_graph(inference, [data])
+            mask = torch.ones([1, 32, 32]).unsqueeze(0).cuda()
+            self.writer.add_graph(inference, [data, mask])
 
         if args.loss_type == "rsil":
             loss = RSIL(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()

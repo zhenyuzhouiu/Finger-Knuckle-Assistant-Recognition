@@ -39,8 +39,10 @@ class ResidualFeatureNet(torch.nn.Module):
         self.resid4 = ResidualBlock(128)
         self.conv4 = ConvLayer(128, 64, kernel_size=3, stride=1)
         self.conv5 = ConvLayer(64, 1, kernel_size=1, stride=1)
+        self.conv6 = ConvLayer
 
     def forward(self, x, mask):
+        mask = mask
         conv1 = F.relu(self.conv1(x))
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))
@@ -315,10 +317,11 @@ class STNWithRFNet(torch.nn.Module):
         theta = theta.view(-1, 2, 3)
         grid = F.affine_grid(theta, x.size(), align_corners=True)
         x = F.grid_sample(x, grid, align_corners=True)
-
+        # the translation of mask should be a quarter of input image
+        mask_theta = theta[:, :, -1] / 4
+        theta[:, :, -1] = mask_theta
         grid = F.affine_grid(theta, mask.size(), align_corners=True)
         mask = F.grid_sample(mask, grid, align_corners=True)
-
 
         return x, mask
 

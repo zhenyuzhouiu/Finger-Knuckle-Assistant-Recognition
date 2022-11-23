@@ -37,13 +37,13 @@ def build_parser():
                         default='triplet', help="how to select the input tuple, triplet, quadruplet, feature")
     # Model
     parser.add_argument('--model', type=str, dest='model', default="RFNet")
-    parser.add_argument('--loss_type', type=str, dest="loss_type", default="rsil")
+    parser.add_argument('--loss_type', type=str, dest="loss_type", default="maskrsil")
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=True)
 
     # Training Strategy
     parser.add_argument('--batch_size', type=int, dest='batch_size', default=3)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
-    parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=1e-3)
+    parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=1e-4)
 
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
@@ -51,15 +51,15 @@ def build_parser():
     parser.add_argument('--alpha', type=float, dest='alpha', default=10)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=20, help="the second margin of quadruplet loss")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
-    parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=5)
-    parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=5)
+    parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=0)
+    parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=0)
     parser.add_argument('--block_size', type=int, dest="block_size", default=8)
-    parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=5)
+    parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=0)
     parser.add_argument('--freeze_stn', type=bool, dest="freeze_stn", default=True)
     parser.add_argument('--freeze_thre', type=float, dest="freeze_thre", default=0)
 
     # fine-tuning
-    parser.add_argument('--start_ckpt', type=str, dest='start_ckpt', default="")
+    parser.add_argument('--start_ckpt', type=str, dest='start_ckpt', default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.0001-r0-a10-2a20-hs0_vs0_11-23-14-18-41/ckpt_epoch_40.pth")
     return parser
 
 

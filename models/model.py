@@ -9,6 +9,7 @@ import models.loss_function
 from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel, \
     STNWithRFNet, ResidualSTNet
 from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
+from models.pytorch_mssim import SSIM
 from torchvision import transforms
 import torchvision
 from torch.utils.data import DataLoader
@@ -139,10 +140,12 @@ class Model(object):
             loss = MaskRSIL(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
             logging("Successfully building mask rsil triplet loss")
         else:
-            raise RuntimeError('Please make sure your loss funtion!')
+            if args.loss_type == "ssim":
+                loss = SSIM(data_range=255, size_average=False, channel=1).cuda()
+                logging("Successfully building mask ssim triplet loss")
+            else:
+                raise RuntimeError('Please make sure your loss funtion!')
 
-        # loss = models.loss_function.CosineSimilarity().cuda()
-        # logging("Successfully building cosine similarity triplet loss")
         inference.train()
         inference.cuda()
 

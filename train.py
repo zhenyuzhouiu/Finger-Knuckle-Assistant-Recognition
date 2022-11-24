@@ -37,18 +37,18 @@ def build_parser():
                         default='triplet', help="how to select the input tuple, triplet, quadruplet, feature")
     # Model
     parser.add_argument('--model', type=str, dest='model', default="RFNet")
-    parser.add_argument('--loss_type', type=str, dest="loss_type", default="maskrsil")
-    parser.add_argument('--if_augment', type=bool, dest="if_augment", default=True)
+    parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssim")
+    parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
 
     # Training Strategy
     parser.add_argument('--batch_size', type=int, dest='batch_size', default=3)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
-    parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=1e-4)
+    parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=1e-3)
 
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
     # Pre-defined Options
-    parser.add_argument('--alpha', type=float, dest='alpha', default=10)
+    parser.add_argument('--alpha', type=float, dest='alpha', default=0.5)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=20, help="the second margin of quadruplet loss")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
     parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=0)
@@ -59,7 +59,7 @@ def build_parser():
     parser.add_argument('--freeze_thre', type=float, dest="freeze_thre", default=0)
 
     # fine-tuning
-    parser.add_argument('--start_ckpt', type=str, dest='start_ckpt', default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.0001-r0-a10-2a20-hs0_vs0_11-23-14-18-41/ckpt_epoch_40.pth")
+    parser.add_argument('--start_ckpt', type=str, dest='start_ckpt', default="")
     return parser
 
 
@@ -70,10 +70,11 @@ def main():
     this_datetime = datetime.datetime.now().strftime('%m-%d-%H-%M-%S')
     args.checkpoint_dir = os.path.join(
         args.checkpoint_dir,
-        "{}_{}_{}-lr{}-r{}-a{}-2a{}-hs{}_vs{}_{}".format(
+        "{}_{}_{}_{}-lr{}-r{}-a{}-2a{}-hs{}_vs{}_{}".format(
             args.db_prefix,
             args.model,
             args.n_tuple,
+            args.loss_type,
             float(args.learning_rate),
             int(args.rotate_angle),
             int(args.alpha),

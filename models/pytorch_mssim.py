@@ -277,7 +277,7 @@ class SSIM(torch.nn.Module):
         self.nonnegative_ssim = nonnegative_ssim
 
     def forward(self, X, X_mask, Y, Y_mask):
-        return ssim(
+        return 1 - ssim(
             X,
             X_mask,
             Y,
@@ -287,7 +287,7 @@ class SSIM(torch.nn.Module):
             win=self.win,
             K=self.K,
             nonnegative_ssim=self.nonnegative_ssim,
-        )
+)
 
 
 class MS_SSIM(torch.nn.Module):
@@ -334,17 +334,17 @@ class MS_SSIM(torch.nn.Module):
 
 
 if __name__ == "__main__":
-    src_image = cv2.imread(r"C:\Users\ZhenyuZHOU\Pictures\zhou.jpg")
+    src_image = cv2.imread("/home/zhenyuzhou/Pictures/timberlake.jpg")
     src_image = resize_img(src_image, size=(1080, 1440))
     src_image = transforms.ToTensor()(src_image).to("cuda").unsqueeze(0)
 
-    src2_image = cv2.imread(r"C:\Users\ZhenyuZHOU\Pictures\cao.jpg")
+    src2_image = cv2.imread("/home/zhenyuzhou/Pictures/zhenyuzhou.jpg")
     src2_image = resize_img(src2_image, size=(1080, 1440))
     src2_image = transforms.ToTensor()(src2_image).to("cuda").unsqueeze(0)
 
     dst_image = torch.rand(src_image.shape, dtype=src_image.dtype).to("cuda")
 
-    s_score = ssim(src_image, dst_image, data_range=1.0, size_average=False)
+    s_score = ssim(src_image, X_mask=0, Y=dst_image, Y_maks=0, data_range=1.0)
     print("The beginning similarity score: " + str(s_score))
 
     src_image = Variable(src_image, requires_grad=False)
@@ -356,7 +356,7 @@ if __name__ == "__main__":
     scheduler = MultiStepLR(optim, milestones=[10, 500, 1000], gamma=0.1)
     for epoch in pbar:
         optim.zero_grad()
-        ls = 2 - (loss(src_image, dst_image) + loss(src2_image, dst_image))
+        ls = (loss(src_image, 0, dst_image, 0) + loss(src2_image, 0, dst_image, 0))
         ls.backward()
         optim.step()
         pbar.set_description(f'Epoch [{epoch}/{3000}]')

@@ -14,6 +14,34 @@ import torchvision.transforms.functional as TF
 import matplotlib.pyplot as plt
 
 
+def resize_img(im, size=(128,128)):
+    """
+    im: numpy array
+    size: (width, height)
+    """
+    # ration = h/w; size(w, h)
+    ratio = size[1] / size[0]
+    h, w, _ = im.shape
+    dest_w = h / ratio
+    dest_h = w * ratio
+    if dest_w > w:
+        crop_h = int((h - dest_h) / 2)
+        if crop_h == 0:
+            crop_h = 1
+        crop_image = im[crop_h - 1:crop_h + int(dest_h), :, :]
+    elif dest_h > h:
+        crop_w = int((w - dest_w) / 2)
+        if crop_w == 0:
+            crop_w = 1
+        crop_image = im[:, crop_w - 1:crop_w + int(dest_w), :]
+    else:
+        crop_image = im
+
+    resize_image = cv2.resize(crop_image, dsize=size)
+
+    return resize_image
+
+
 def augment_hsv(im, hgain=0.015, sgain=0.7, vgain=0.4):
     # When I load_image, I use Image.open(path).convert(options)
     # HSV color-space augmentation

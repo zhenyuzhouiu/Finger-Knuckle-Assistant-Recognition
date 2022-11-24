@@ -3,7 +3,15 @@
 import warnings
 
 import torch
+import cv2
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+from torchvision import transforms
+from torch.autograd import Variable
+from torch.optim import Adam
+from tqdm import tqdm
+from data.augmentations import resize_img
+from torch.optim.lr_scheduler import MultiStepLR
 
 
 def _fspecial_gauss_1d(size, sigma):
@@ -17,7 +25,7 @@ def _fspecial_gauss_1d(size, sigma):
     """
     coords = torch.arange(size, dtype=torch.float)
     coords -= size // 2
-
+    #
     g = torch.exp(-(coords ** 2) / (2 * sigma ** 2))
     g /= g.sum()
 
@@ -28,7 +36,7 @@ def gaussian_filter(input, win):
     r""" Blur input with 1-D kernel
     Args:
         input (torch.Tensor): a batch of tensors to be blurred
-        window (torch.Tensor): 1-D gauss kernel
+        win (torch.Tensor): 1-D gauss kernel
 
     Returns:
         torch.Tensor: blurred tensors
@@ -55,7 +63,6 @@ def gaussian_filter(input, win):
 
 
 def _ssim(X, Y, data_range, win, size_average=True, K=(0.01, 0.03)):
-
     r""" Calculate ssim index for X and Y
 
     Args:
@@ -88,24 +95,28 @@ def _ssim(X, Y, data_range, win, size_average=True, K=(0.01, 0.03)):
     sigma2_sq = compensation * (gaussian_filter(Y * Y, win) - mu2_sq)
     sigma12 = compensation * (gaussian_filter(X * Y, win) - mu1_mu2)
 
+    # cs_map.shape = ssim_map.shape:-> [b, c, h, w]
     cs_map = (2 * sigma12 + C2) / (sigma1_sq + sigma2_sq + C2)  # set alpha=beta=gamma=1
     ssim_map = ((2 * mu1_mu2 + C1) / (mu1_sq + mu2_sq + C1)) * cs_map
 
+    # torch.flatten(input, start_dim, end_dim)
     ssim_per_channel = torch.flatten(ssim_map, 2).mean(-1)
     cs = torch.flatten(cs_map, 2).mean(-1)
     return ssim_per_channel, cs
 
 
 def ssim(
-    X,
-    Y,
-    data_range=255,
-    size_average=True,
-    win_size=11,
-    win_sigma=1.5,
-    win=None,
-    K=(0.01, 0.03),
-    nonnegative_ssim=False,
+        X,
+        X_mask,
+        Y,
+        Y_maks,
+        data_range=255,
+        size_average=True,
+        win_size=11,
+        win_sigma=1.5,
+        win=None,
+        K=(0.01, 0.03),
+        nonnegative_ssim=False,
 ):
     r""" interface of ssim
     Args:
@@ -125,6 +136,7 @@ def ssim(
     if not X.shape == Y.shape:
         raise ValueError(f"Input images should have the same dimensions, but got {X.shape} and {Y.shape}.")
 
+    # squeeze dimension 2 & 3
     for d in range(len(X.shape) - 1, 1, -1):
         X = X.squeeze(dim=d)
         Y = Y.squeeze(dim=d)
@@ -142,9 +154,12 @@ def ssim(
         raise ValueError("Window size should be odd.")
 
     if win is None:
+        # win.shape:-> [1, 1, win_size]
         win = _fspecial_gauss_1d(win_size, win_sigma)
+        # win.shape:-> [1, 1, 1, win_size]
         win = win.repeat([X.shape[1]] + [1] * (len(X.shape) - 1))
 
+    # ssim_per_channel.shape = cs.shape:-> [b, c]
     ssim_per_channel, cs = _ssim(X, Y, data_range=data_range, win=win, size_average=False, K=K)
     if nonnegative_ssim:
         ssim_per_channel = torch.relu(ssim_per_channel)
@@ -156,9 +171,8 @@ def ssim(
 
 
 def ms_ssim(
-    X, Y, data_range=255, size_average=True, win_size=11, win_sigma=1.5, win=None, weights=None, K=(0.01, 0.03)
+        X, Y, data_range=255, size_average=True, win_size=11, win_sigma=1.5, win=None, weights=None, K=(0.01, 0.03)
 ):
-
     r""" interface of ms-ssim
     Args:
         X (torch.Tensor): a batch of images, (N,C,[T,]H,W)
@@ -198,7 +212,7 @@ def ms_ssim(
 
     smaller_side = min(X.shape[-2:])
     assert smaller_side > (win_size - 1) * (
-        2 ** 4
+            2 ** 4
     ), "Image size should be larger than %d due to the 4 downsamplings in ms-ssim" % ((win_size - 1) * (2 ** 4))
 
     if weights is None:
@@ -232,15 +246,15 @@ def ms_ssim(
 
 class SSIM(torch.nn.Module):
     def __init__(
-        self,
-        data_range=255,
-        size_average=True,
-        win_size=11,
-        win_sigma=1.5,
-        channel=3,
-        spatial_dims=2,
-        K=(0.01, 0.03),
-        nonnegative_ssim=False,
+            self,
+            data_range=255,
+            size_average=True,
+            win_size=11,
+            win_sigma=1.5,
+            channel=3,
+            spatial_dims=2,
+            K=(0.01, 0.03),
+            nonnegative_ssim=False,
     ):
         r""" class for ssim
         Args:
@@ -255,16 +269,19 @@ class SSIM(torch.nn.Module):
 
         super(SSIM, self).__init__()
         self.win_size = win_size
+        # self.win.shape:-> [channel, 1, 1, win_size]
         self.win = _fspecial_gauss_1d(win_size, win_sigma).repeat([channel, 1] + [1] * spatial_dims)
         self.size_average = size_average
         self.data_range = data_range
         self.K = K
         self.nonnegative_ssim = nonnegative_ssim
 
-    def forward(self, X, Y):
+    def forward(self, X, X_mask, Y, Y_mask):
         return ssim(
             X,
+            X_mask,
             Y,
+            Y_mask,
             data_range=self.data_range,
             size_average=self.size_average,
             win=self.win,
@@ -275,15 +292,15 @@ class SSIM(torch.nn.Module):
 
 class MS_SSIM(torch.nn.Module):
     def __init__(
-        self,
-        data_range=255,
-        size_average=True,
-        win_size=11,
-        win_sigma=1.5,
-        channel=3,
-        spatial_dims=2,
-        weights=None,
-        K=(0.01, 0.03),
+            self,
+            data_range=255,
+            size_average=True,
+            win_size=11,
+            win_sigma=1.5,
+            channel=3,
+            spatial_dims=2,
+            weights=None,
+            K=(0.01, 0.03),
     ):
         r""" class for ms-ssim
         Args:
@@ -314,3 +331,52 @@ class MS_SSIM(torch.nn.Module):
             weights=self.weights,
             K=self.K,
         )
+
+
+if __name__ == "__main__":
+    src_image = cv2.imread(r"C:\Users\ZhenyuZHOU\Pictures\zhou.jpg")
+    src_image = resize_img(src_image, size=(1080, 1440))
+    src_image = transforms.ToTensor()(src_image).to("cuda").unsqueeze(0)
+
+    src2_image = cv2.imread(r"C:\Users\ZhenyuZHOU\Pictures\cao.jpg")
+    src2_image = resize_img(src2_image, size=(1080, 1440))
+    src2_image = transforms.ToTensor()(src2_image).to("cuda").unsqueeze(0)
+
+    dst_image = torch.rand(src_image.shape, dtype=src_image.dtype).to("cuda")
+
+    s_score = ssim(src_image, dst_image, data_range=1.0, size_average=False)
+    print("The beginning similarity score: " + str(s_score))
+
+    src_image = Variable(src_image, requires_grad=False)
+    dst_image = Variable(dst_image, requires_grad=True)
+
+    optim = Adam(params=[dst_image], lr=0.1)
+    loss = SSIM(data_range=1.0, channel=3)
+    pbar = tqdm(range(3000))
+    scheduler = MultiStepLR(optim, milestones=[10, 500, 1000], gamma=0.1)
+    for epoch in pbar:
+        optim.zero_grad()
+        ls = 2 - (loss(src_image, dst_image) + loss(src2_image, dst_image))
+        ls.backward()
+        optim.step()
+        pbar.set_description(f'Epoch [{epoch}/{3000}]')
+        pbar.set_postfix(loss_inference="{:.6f}".format(ls.item()))
+
+        scheduler.step()
+
+    s_image = src_image.squeeze(0).data.cpu().numpy().transpose(1, 2, 0)
+    s_image = cv2.cvtColor(s_image, cv2.COLOR_BGR2RGB)
+    plt.subplot(1, 3, 1)
+    plt.title("source image")
+    plt.imshow(s_image)
+    s2_image = src2_image.squeeze(0).data.cpu().numpy().transpose(1, 2, 0)
+    s2_image = cv2.cvtColor(s2_image, cv2.COLOR_BGR2RGB)
+    plt.subplot(1, 3, 2)
+    plt.title("source2 image")
+    plt.imshow(s2_image)
+    d_image = dst_image.squeeze(0).data.cpu().numpy().transpose(1, 2, 0)
+    d_image = cv2.cvtColor(d_image, cv2.COLOR_BGR2RGB)
+    plt.subplot(1, 3, 3)
+    plt.title("learnable image")
+    plt.imshow(d_image)
+    plt.show()

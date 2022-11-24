@@ -81,8 +81,15 @@ class Model(object):
             example_anchor = example_data[:, 0:3, :, :]
             example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
                                                                                          example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2), example_anchor.size(3))
-            example_negative2 = example_data[:, 3 * 3 * self.samples_subject:, :, :].reshape(-1, 3,example_anchor.size(2), example_anchor.size(3))
+            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1,
+                                                                                                                    3,
+                                                                                                                    example_anchor.size(
+                                                                                                                        2),
+                                                                                                                    example_anchor.size(
+                                                                                                                        3))
+            example_negative2 = example_data[:, 3 * 3 * self.samples_subject:, :, :].reshape(-1, 3,
+                                                                                             example_anchor.size(2),
+                                                                                             example_anchor.size(3))
             anchor_grid = torchvision.utils.make_grid(example_anchor)
             self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
             positive_grid = torchvision.utils.make_grid(example_positive)
@@ -97,7 +104,12 @@ class Model(object):
             example_anchor = example_data[:, 0:3, :, :]
             example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
                                                                                          example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1,3,example_anchor.size(2),example_anchor.size(3))
+            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1,
+                                                                                                                    3,
+                                                                                                                    example_anchor.size(
+                                                                                                                        2),
+                                                                                                                    example_anchor.size(
+                                                                                                                        3))
             anchor_grid = torchvision.utils.make_grid(example_anchor)
             self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
             positive_grid = torchvision.utils.make_grid(example_positive)
@@ -199,17 +211,20 @@ class Model(object):
                 fms = fms.view(x.size(0), -1, fms.size(2), fms.size(3))
                 mask = mask.view(x.size(0), -1, mask.size(2), mask.size(3))
 
-                anchor_fm = fms[:, 0:ch, :, :].unsqueeze(1)  # anchor has one sample
+                anchor_fm = fms[:, 0:ch, :, :]  # anchor has one sample
+                if len(anchor_fm.shape) == 3:
+                    anchor_fm.unsqueeze(1)
                 anchor_mask = mask[:, 1, :, :].unsqueeze(1)
-                pos_fm = fms[:, 1*ch:self.samples_subject*ch, :, :].contiguous()
+                pos_fm = fms[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
                 pos_mask = mask[:, 1:self.samples_subject, :, :].contiguous()
-                neg_fm = fms[:, self.samples_subject*ch:, :, :].contiguous()
+                neg_fm = fms[:, self.samples_subject * ch:, :, :].contiguous()
                 neg_mask = mask[:, self.samples_subject:, :, :].contiguous()
-                nneg = neg_fm.size(1)
+                nneg = int(neg_fm.size(1) / ch)
                 neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))
                 neg_mask = neg_mask.view(-1, 1, neg_mask.size(2), neg_fm.size(3))
                 an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
-                                    anchor_mask.repeat(1, nneg, 1, 1).view(-1, 1, anchor_mask.size(2), anchor_mask.size(3)),
+                                    anchor_mask.repeat(1, nneg, 1, 1).view(-1, 1, anchor_mask.size(2),
+                                                                           anchor_mask.size(3)),
                                     neg_fm,
                                     neg_mask)
                 # an_loss.shape:-> (batch_size, 10)
@@ -217,11 +232,12 @@ class Model(object):
                 # min(1)[0]
                 an_loss = an_loss.view((-1, nneg)).min(1)[0]
 
-                npos = pos_fm.size(1)
+                npos = int(pos_fm.size(1) / ch)
                 pos_fm = pos_fm.view(-1, ch, pos_fm.size(2), pos_fm.size(3))
                 pos_mask = pos_mask.view(-1, 1, pos_mask.size(2), pos_mask.size(3))
                 ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
-                                    anchor_mask.repeat(1, npos, 1, 1).view(-1, 1, anchor_mask.size(2), anchor_mask.size(3)),
+                                    anchor_mask.repeat(1, npos, 1, 1).view(-1, 1, anchor_mask.size(2),
+                                                                           anchor_mask.size(3)),
                                     pos_fm,
                                     pos_mask)
                 ap_loss = ap_loss.view((-1, npos)).max(1)[0]

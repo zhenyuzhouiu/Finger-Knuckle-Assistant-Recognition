@@ -7,7 +7,7 @@ from torch.autograd import Variable
 
 import models.loss_function
 from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel, \
-    STNWithRFNet, ResidualSTNet
+    STNWithRFNet, ResidualSTNet, RFNet64
 from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
 from models.pytorch_mssim import SSIM
 from torchvision import transforms
@@ -36,7 +36,8 @@ model_dict = {
     "FusionNet": FusionModel().cuda(),
     "AssistantModel": AssistantModel().cuda(),
     "STNWithRFNet": STNWithRFNet().cuda(),
-    "ResidualSTNet": ResidualSTNet().cuda()
+    "ResidualSTNet": ResidualSTNet().cuda(),
+    "RFNet64": RFNet64().cuda()
 }
 
 
@@ -114,7 +115,7 @@ class Model(object):
     def _build_model(self, args):
         if args.model not in ["RFNet", "DeConvRFNet", "FKEfficientNet",
                               "RFNWithSTNet", "ConvNet", "FusionNet", "AssistantModel", "STNWithRFNet",
-                              "ResidualSTNet"]:
+                              "ResidualSTNet", "RFNet64"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         if args.model in ["FusionNet", "AssistantModel"]:
@@ -141,7 +142,7 @@ class Model(object):
             logging("Successfully building mask rsil triplet loss")
         else:
             if args.loss_type == "ssim":
-                loss = SSIM(data_range=1., size_average=False, channel=1).cuda()
+                loss = SSIM(data_range=1., size_average=False, channel=64).cuda()
                 logging("Successfully building mask ssim triplet loss")
             else:
                 raise RuntimeError('Please make sure your loss funtion!')
@@ -193,20 +194,21 @@ class Model(object):
                 mask = Variable(mask, requires_grad=False)
                 fms, mask = self.inference(x.view(-1, 3, x.size(2), x.size(3)),
                                            mask.view(-1, 1, mask.size(2), mask.size(3)))
+                bs, ch, he, wi = fms.shape
                 # (batch_size, anchor+positive+negative, 32, 32)
                 fms = fms.view(x.size(0), -1, fms.size(2), fms.size(3))
                 mask = mask.view(x.size(0), -1, mask.size(2), mask.size(3))
 
-                anchor_fm = fms[:, 0, :, :].unsqueeze(1)  # anchor has one sample
+                anchor_fm = fms[:, 0:ch, :, :].unsqueeze(1)  # anchor has one sample
                 anchor_mask = mask[:, 1, :, :].unsqueeze(1)
-                pos_fm = fms[:, 1:self.samples_subject, :, :].contiguous()
+                pos_fm = fms[:, 1*ch:self.samples_subject*ch, :, :].contiguous()
                 pos_mask = mask[:, 1:self.samples_subject, :, :].contiguous()
-                neg_fm = fms[:, self.samples_subject:, :, :].contiguous()
+                neg_fm = fms[:, self.samples_subject*ch:, :, :].contiguous()
                 neg_mask = mask[:, self.samples_subject:, :, :].contiguous()
                 nneg = neg_fm.size(1)
-                neg_fm = neg_fm.view(-1, 1, neg_fm.size(2), neg_fm.size(3))
+                neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))
                 neg_mask = neg_mask.view(-1, 1, neg_mask.size(2), neg_fm.size(3))
-                an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
+                an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
                                     anchor_mask.repeat(1, nneg, 1, 1).view(-1, 1, anchor_mask.size(2), anchor_mask.size(3)),
                                     neg_fm,
                                     neg_mask)
@@ -216,9 +218,9 @@ class Model(object):
                 an_loss = an_loss.view((-1, nneg)).min(1)[0]
 
                 npos = pos_fm.size(1)
-                pos_fm = pos_fm.view(-1, 1, pos_fm.size(2), pos_fm.size(3))
+                pos_fm = pos_fm.view(-1, ch, pos_fm.size(2), pos_fm.size(3))
                 pos_mask = pos_mask.view(-1, 1, pos_mask.size(2), pos_mask.size(3))
-                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
+                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
                                     anchor_mask.repeat(1, npos, 1, 1).view(-1, 1, anchor_mask.size(2), anchor_mask.size(3)),
                                     pos_fm,
                                     pos_mask)

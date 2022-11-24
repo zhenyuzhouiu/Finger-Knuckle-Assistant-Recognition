@@ -36,7 +36,7 @@ def build_parser():
     parser.add_argument('--n_tuple', type=str, dest='n_tuple',
                         default='triplet', help="how to select the input tuple, triplet, quadruplet, feature")
     # Model
-    parser.add_argument('--model', type=str, dest='model', default="RFNet")
+    parser.add_argument('--model', type=str, dest='model', default="RFNet64")
     parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssim")
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
 
@@ -48,7 +48,7 @@ def build_parser():
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
     # Pre-defined Options
-    parser.add_argument('--alpha', type=float, dest='alpha', default=1)
+    parser.add_argument('--alpha', type=float, dest='alpha', default=0.5)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=20, help="the second margin of quadruplet loss")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
     parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=0)

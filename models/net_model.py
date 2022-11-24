@@ -92,24 +92,32 @@ class ResidualSTNet(torch.nn.Module):
         return conv5
 
 
-class ResidualFeatureNet_Nohead(torch.nn.Module):
+class RFNet64(torch.nn.Module):
     def __init__(self):
-        super(ResidualFeatureNet_Nohead, self).__init__()
+        super(RFNet64, self).__init__()
         # Initial convolution layers
         self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
         self.conv2 = ConvLayer(32, 64, kernel_size=3, stride=2)
         self.conv3 = ConvLayer(64, 128, kernel_size=3, stride=1)
         self.resid1 = ResidualBlock(128)
         self.resid2 = ResidualBlock(128)
+        self.resid3 = ResidualBlock(128)
+        self.resid4 = ResidualBlock(128)
+        self.conv4 = ConvLayer(128, 64, kernel_size=3, stride=1)
 
-    def forward(self, x):
+    def forward(self, x, mask):
+        mask = mask
         conv1 = F.relu(self.conv1(x))
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))
         resid1 = self.resid1(conv3)
         resid2 = self.resid1(resid1)
+        resid3 = self.resid1(resid2)
+        resid4 = self.resid1(resid3)
+        conv4 = F.sigmoid(self.conv4(resid4))
 
-        return resid2
+        # conv4.shape:-> [b, 64, 32, 32]
+        return conv4, mask
 
 
 class ConvNet(torch.nn.Module):

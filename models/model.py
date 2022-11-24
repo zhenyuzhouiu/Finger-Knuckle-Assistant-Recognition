@@ -141,7 +141,7 @@ class Model(object):
             logging("Successfully building mask rsil triplet loss")
         else:
             if args.loss_type == "ssim":
-                loss = SSIM(data_range=255, size_average=False, channel=1).cuda()
+                loss = SSIM(data_range=1., size_average=False, channel=1).cuda()
                 logging("Successfully building mask ssim triplet loss")
             else:
                 raise RuntimeError('Please make sure your loss funtion!')

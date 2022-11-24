@@ -25,6 +25,7 @@ import models.loss_function, models.net_model
 from protocol_util import *
 from torchvision import transforms
 from inspect import getsourcefile
+from models.pytorch_mssim import SSIM
 import os.path as path
 from os.path import join
 
@@ -200,10 +201,10 @@ parser.add_argument("--test_path", type=str,
                     default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/01/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.0001-r0-a10-2a20-hs0_vs0_11-23-14-20-55/output/01-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNWithSTNet_triplet_maskrsil-lr0.001-r0-a10-2a20-hs0_vs0_11-24-16-55-29/output/01-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet_triplet-lr0.0001-r0-a10-2a20-hs0_vs0_11-23-14-20-55/ckpt_epoch_3040.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNWithSTNet_triplet_maskrsil-lr0.001-r0-a10-2a20-hs0_vs0_11-24-16-55-29/ckpt_epoch_1680.pth",
                     dest="model_path")
 parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
 parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
@@ -211,7 +212,7 @@ parser.add_argument('--block_size', type=int, dest="block_size", default=8)
 parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=0)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-parser.add_argument('--model', type=str, dest='model', default="RFNet")
+parser.add_argument('--model', type=str, dest='model', default="RFNWithSTNet")
 
 model_dict = {
     "RFNet": models.net_model.ResidualFeatureNet().cuda(),
@@ -229,8 +230,7 @@ inference = model_dict[args.model].cuda()
 inference.load_state_dict(torch.load(args.model_path))
 # Loss = models.loss_function.WholeRotationShiftedLoss(args.shift_size, args.shift_size, args.angle)
 Loss = models.loss_function.MaskRSIL(args.shift_size, args.shift_size, args.rotate_angle)
-# Loss = models.loss_function.ImageBlockRotationAndTranslation(args.block_size, args.shift_size, args.shift_size,
-#                                                              args.rotate_angle, args.top_k)
+# Loss = SSIM(data_range=1., size_average=False, channel=1)
 Loss.cuda()
 Loss.eval()
 

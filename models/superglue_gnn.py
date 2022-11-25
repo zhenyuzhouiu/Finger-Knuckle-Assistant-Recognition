@@ -233,7 +233,7 @@ class SuperGlue(nn.Module):
                 self.config['weights']))
         else:
             print('Train SuperGlue model (\"{}\" weights from scratch)'.format(
-                self.config['weights']))
+                self.config['weight']))
     def forward(self, i_fm0, i_fm1):
         """Run SuperGlue on a pair of keypoints and descriptors"""
         # i_fm1.shape:-> [b, ch, h, w] [b, 64, 32, 32]

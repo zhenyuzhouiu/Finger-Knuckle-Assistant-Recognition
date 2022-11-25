@@ -49,7 +49,12 @@ class Model(object):
         self.samples_subject = args.samples_subject
         self.train_loader, self.dataset_size = self._build_dataset_loader(args)
         self.inference, self.loss = self._build_model(args)
-        self.optimizer = torch.optim.Adam(self.inference.parameters(), args.learning_rate)
+        if self.args.loss_type == "ssimgnn":
+            self.optimizer = torch.optim.Adam([{'params': self.inference.parameters(),
+                                                'params': self.loss.parameters()}],
+                                              args.learning_rate)
+        else:
+            self.optimizer = torch.optim.Adam(self.inference.parameters(), args.learning_rate)
 
     def _build_dataset_loader(self, args):
         transform = transforms.Compose([

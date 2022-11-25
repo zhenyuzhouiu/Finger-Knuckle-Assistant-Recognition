@@ -226,8 +226,8 @@ class SuperGlue(nn.Module):
             self.config['descriptor_dim'], self.config['descriptor_dim'],
             kernel_size=1, bias=True)
 
-        if self.config['weights'] == '':
-            path = self.config['weights']
+        if self.config['weight'] == '':
+            path = self.config['weight']
             self.load_state_dict(torch.load(str(path)))
             print('Loaded SuperGlue model (\"{}\" weights)'.format(
                 self.config['weights']))

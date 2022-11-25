@@ -429,7 +429,7 @@ class FusionModel(torch.nn.Module):
         self.bn3 = nn.BatchNorm2d(num_features=64)
 
         # extract finger knuckle features
-        self.fknet = ResidualFeatureNet_Nohead()
+        self.fknet = RFNet64()
 
         self.middle = nn.Conv2d(in_channels=192, out_channels=128, kernel_size=3, padding=1)
         self.middlebn = nn.BatchNorm2d(num_features=128)

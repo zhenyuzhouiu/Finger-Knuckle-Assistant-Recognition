@@ -9,7 +9,7 @@ import models.loss_function
 from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel, \
     STNWithRFNet, ResidualSTNet, RFNet64
 from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
-from models.pytorch_mssim import SSIM
+from models.pytorch_mssim import SSIM, SSIMGNN
 from torchvision import transforms
 import torchvision
 from torch.utils.data import DataLoader
@@ -43,6 +43,7 @@ model_dict = {
 
 class Model(object):
     def __init__(self, args, writer):
+        self.args = args
         self.writer = writer
         self.batch_size = args.batch_size
         self.samples_subject = args.samples_subject
@@ -145,6 +146,8 @@ class Model(object):
             data = Variable(data, requires_grad=False)
             mask = torch.ones([1, 32, 32]).unsqueeze(0).cuda()
             self.writer.add_graph(inference, [data, mask])
+        inference.cuda()
+        inference.train()
 
         if args.loss_type == "rsil":
             loss = RSIL(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
@@ -155,13 +158,14 @@ class Model(object):
         else:
             if args.loss_type == "ssim":
                 loss = SSIM(data_range=1., size_average=False, channel=64).cuda()
-                logging("Successfully building mask ssim triplet loss")
+                logging("Successfully building ssim triplet loss")
+            elif args.loss_type == "ssimgnn":
+                loss = SSIMGNN(data_range=1., size_average=False, channel=64, config={'weight': args.loss_start_ckpt}).cuda()
+                logging("Successfully building ssimgnn triplet loss")
             else:
                 raise RuntimeError('Please make sure your loss funtion!')
-
-        inference.train()
-        inference.cuda()
-
+        loss.cuda()
+        loss.train()
         return inference, loss
 
     def triplet_train(self, args):
@@ -520,6 +524,13 @@ class Model(object):
         self.writer.close()
 
     def save(self, checkpoint_dir, e):
+        if self.args.loss_type == "ssimgnn":
+            self.loss.eval()
+            self.loss.cpu()
+            ckpt_model_filename = os.path.join(checkpoint_dir, "loss_ckpt_epoch_" + str(e) + ".pth")
+            torch.save(self.loss.state_dict(), ckpt_model_filename)
+            self.loss.cuda()
+            self.loss.train()
         self.inference.eval()
         self.inference.cpu()
         ckpt_model_filename = os.path.join(checkpoint_dir, "ckpt_epoch_" + str(e) + ".pth")

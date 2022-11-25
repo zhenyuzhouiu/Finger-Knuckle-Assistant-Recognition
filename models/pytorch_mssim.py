@@ -302,6 +302,7 @@ class SSIMGNN(torch.nn.Module):
             spatial_dims=2,
             K=(0.01, 0.03),
             nonnegative_ssim=False,
+            config={}
     ):
         r""" class for ssim
         Args:
@@ -315,7 +316,7 @@ class SSIMGNN(torch.nn.Module):
         """
 
         super(SSIMGNN, self).__init__()
-        self.gnn = SuperGlue()
+        self.gnn = SuperGlue(config=config)
         self.win_size = win_size
         # self.win.shape:-> [channel, 1, 1, win_size]
         self.win = _fspecial_gauss_1d(win_size, win_sigma).repeat([channel, 1] + [1] * spatial_dims)
@@ -325,7 +326,7 @@ class SSIMGNN(torch.nn.Module):
         self.nonnegative_ssim = nonnegative_ssim
 
     def forward(self, X, X_mask, Y, Y_mask):
-        X, Y = SuperGlue(X, Y)
+        X, Y = self.gnn(X, Y)
         return 1 - ssim(
             X,
             X_mask,

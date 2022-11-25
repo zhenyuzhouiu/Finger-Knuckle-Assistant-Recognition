@@ -209,6 +209,7 @@ class SuperGlue(nn.Module):
         'descriptor_dim': 64,
         'keypoint_encoder': [32, 64],
         'GNN_layers': ['self', 'cross'] * 1,
+        'weight': ''
     }
 
     def __init__(self, config):
@@ -225,6 +226,14 @@ class SuperGlue(nn.Module):
             self.config['descriptor_dim'], self.config['descriptor_dim'],
             kernel_size=1, bias=True)
 
+        if self.config['weights'] == '':
+            path = self.config['weights']
+            self.load_state_dict(torch.load(str(path)))
+            print('Loaded SuperGlue model (\"{}\" weights)'.format(
+                self.config['weights']))
+        else:
+            print('Train SuperGlue model (\"{}\" weights from scratch)'.format(
+                self.config['weights']))
     def forward(self, i_fm0, i_fm1):
         """Run SuperGlue on a pair of keypoints and descriptors"""
         # i_fm1.shape:-> [b, ch, h, w] [b, 64, 32, 32]
@@ -234,9 +243,9 @@ class SuperGlue(nn.Module):
         desc1 = i_fm1.view(bs, ch, -1)
 
         kpts0 = torch.arange(0, he*wi).view(he*wi, -1).repeat(1, 2).unsqueeze(0).repeat(bs, 1, 1)
-        kpts0.to(i_fm0.device)
+        kpts0 = kpts0.type(i_fm0.dtype).to(i_fm0.device)
         kpts1 = kpts0
-        score0 = torch.ones([bs, he*wi, 1]).to(i_fm0.device)
+        score0 = torch.ones([bs, he*wi]).type(i_fm0.dtype).to(i_fm0.device)
         score1 = score0
 
         # Keypoint MLP encoder.
@@ -251,4 +260,4 @@ class SuperGlue(nn.Module):
         mdesc0, mdesc1 = self.final_proj(desc0), self.final_proj(desc1)
         o_fm0 = mdesc0.view(bs, ch, he, wi)
         o_fm1 = mdesc1.view(bs, ch, he, wi)
-        return o_fm0, mdesc1
+        return o_fm0, o_fm1

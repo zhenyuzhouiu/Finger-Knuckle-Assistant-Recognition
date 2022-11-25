@@ -37,18 +37,18 @@ def build_parser():
                         default='triplet', help="how to select the input tuple, triplet, quadruplet, feature")
     # Model
     parser.add_argument('--model', type=str, dest='model', default="RFNet64")
-    parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssim")
+    parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssimgnn")
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
 
     # Training StrategyResidualSTNet
-    parser.add_argument('--batch_size', type=int, dest='batch_size', default=3)
+    parser.add_argument('--batch_size', type=int, dest='batch_size', default=2)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
     parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=1e-3)
 
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
     # Pre-defined Options
-    parser.add_argument('--alpha', type=float, dest='alpha', default=0.7)
+    parser.add_argument('--alpha', type=float, dest='alpha', default=0.5)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=20, help="the second margin of quadruplet loss")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
     parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=0)
@@ -60,6 +60,7 @@ def build_parser():
 
     # fine-tuning
     parser.add_argument('--start_ckpt', type=str, dest='start_ckpt', default="")
+    parser.add_argument('--loss_start_ckpt', type=str, dest='loss_start_ckpt', default="")
     return parser
 
 

@@ -165,7 +165,7 @@ class Model(object):
                 loss = SSIM(data_range=1., size_average=False, channel=64).cuda()
                 logging("Successfully building ssim triplet loss")
             elif args.loss_type == "ssimgnn":
-                loss = SSIMGNN(data_range=1., size_average=False, channel=64, config={'weight': args.loss_start_ckpt}).cuda()
+                loss = SSIMGNN(data_range=1., size_average=False, channel=64, config=args.sglue_conf).cuda()
                 logging("Successfully building ssimgnn triplet loss")
             else:
                 raise RuntimeError('Please make sure your loss funtion!')

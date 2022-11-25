@@ -57,10 +57,12 @@ def build_parser():
     parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=0)
     parser.add_argument('--freeze_stn', type=bool, dest="freeze_stn", default=True)
     parser.add_argument('--freeze_thre', type=float, dest="freeze_thre", default=0)
+    parser.add_argument('--sglue_conf', type=dict, dest="sglue_conf", default={
+        'GNN_layers': ['self', 'cross'] * 1,
+        'weight': ''})
 
     # fine-tuning
     parser.add_argument('--start_ckpt', type=str, dest='start_ckpt', default="")
-    parser.add_argument('--loss_start_ckpt', type=str, dest='loss_start_ckpt', default="")
     return parser
 
 

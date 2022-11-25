@@ -25,7 +25,7 @@ import models.loss_function, models.net_model
 from protocol_util import *
 from torchvision import transforms
 from inspect import getsourcefile
-from models.pytorch_mssim import SSIM
+from models.pytorch_mssim import SSIM, SSIMGNN
 import os.path as path
 from os.path import join
 
@@ -206,13 +206,16 @@ parser.add_argument("--out_path", type=str,
 parser.add_argument("--model_path", type=str,
                     default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/ssim/MaskLM_RFNet_triplet_ssim-lr0.001-r0-a1-2a20-hs0_vs0_11-24-21-04-13/ckpt_epoch_3000.pth",
                     dest="model_path")
+parser.add_argument("--loss_path", type=str,
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/ssim/MaskLM_RFNet_triplet_ssim-lr0.001-r0-a1-2a20-hs0_vs0_11-24-21-04-13/loss_ckpt_epoch_3000.pth",
+                    dest="loss_path")
 parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
 parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
 parser.add_argument('--block_size', type=int, dest="block_size", default=8)
 parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=0)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-parser.add_argument('--model', type=str, dest='model', default="RFNet")
+parser.add_argument('--model', type=str, dest='model', default="RFNet64")
 
 model_dict = {
     "RFNet": models.net_model.ResidualFeatureNet().cuda(),
@@ -231,7 +234,9 @@ inference = model_dict[args.model].cuda()
 inference.load_state_dict(torch.load(args.model_path))
 # Loss = models.loss_function.WholeRotationShiftedLoss(args.shift_size, args.shift_size, args.angle)
 # Loss = models.loss_function.MaskRSIL(args.shift_size, args.shift_size, args.rotate_angle)
-Loss = SSIM(data_range=1., size_average=False, channel=1)
+Loss = SSIM(data_range=1., size_average=False, channel=64)
+# Loss = SSIMGNN(data_range=1., size_average=False, channel=64, config={"weight": args.loss_paht})
+
 Loss.cuda()
 Loss.eval()
 

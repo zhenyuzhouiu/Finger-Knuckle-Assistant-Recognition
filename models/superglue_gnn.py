@@ -225,6 +225,7 @@ class SuperGlue(nn.Module):
         self.final_proj = nn.Conv1d(
             self.config['descriptor_dim'], self.config['descriptor_dim'],
             kernel_size=1, bias=True)
+        self.sigmoid = nn.Sigmoid()
 
         if self.config['weight'] != '':
             path = self.config['weight']
@@ -257,7 +258,7 @@ class SuperGlue(nn.Module):
         desc0, desc1 = self.gnn(desc0, desc1)
 
         # Final MLP projection.
-        mdesc0, mdesc1 = self.final_proj(desc0), self.final_proj(desc1)
+        mdesc0, mdesc1 = self.sigmoid(self.final_proj(desc0)), self.sigmoid(self.final_proj(desc1))
         o_fm0 = mdesc0.view(bs, ch, he, wi)
         o_fm1 = mdesc1.view(bs, ch, he, wi)
         return o_fm0, o_fm1

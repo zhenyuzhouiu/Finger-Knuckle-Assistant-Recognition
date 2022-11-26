@@ -544,5 +544,9 @@ class Model(object):
         self.inference.train()
 
     def load(self, checkpoint_dir):
+        if self.args.loss_type == "ssimgnn":
+            self.loss.load_state_dict(torch.load(self.args.sglue_conf["weight"]))
+            self.loss.cuda()
+            self.loss.train()
         self.inference.load_state_dict(torch.load(checkpoint_dir))
         self.inference.cuda()

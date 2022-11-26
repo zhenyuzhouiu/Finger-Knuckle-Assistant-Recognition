@@ -38,7 +38,7 @@ def build_parser():
     # Model
     parser.add_argument('--model', type=str, dest='model', default="RFNet64")
     parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssimgnn")
-    parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
+    parser.add_argument('--if_augment', type=bool, dest="if_augment", default=True)
 
     # Training StrategyResidualSTNet
     parser.add_argument('--batch_size', type=int, dest='batch_size', default=2)

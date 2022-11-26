@@ -227,14 +227,14 @@ class SuperGlue(nn.Module):
             kernel_size=1, bias=True)
         self.sigmoid = nn.Sigmoid()
 
-        if self.config['weight'] != '':
-            path = self.config['weight']
-            self.load_state_dict(torch.load(str(path)))
-            print('Loaded SuperGlue model (\"{}\" weights)'.format(
-                self.config['weights']))
-        else:
-            print('Train SuperGlue model (\"{}\" weights from scratch)'.format(
-                self.config['weight']))
+        # if self.config['weight'] != '':
+        #     path = self.config['weight']
+        #     self.load_state_dict(torch.load(str(path)))
+        #     print('Loaded SuperGlue model (\"{}\" weights)'.format(
+        #         self.config['weights']))
+        # else:
+        #     print('Train SuperGlue model (\"{}\" weights from scratch)'.format(
+        #         self.config['weight']))
     def forward(self, i_fm0, i_fm1):
         """Run SuperGlue on a pair of keypoints and descriptors"""
         # i_fm1.shape:-> [b, ch, h, w] [b, 64, 32, 32]

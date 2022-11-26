@@ -46,7 +46,7 @@ def calc_feats_more(*paths, size=(208, 184)):
     w, h = size[0], size[1]
     ratio = size[1] / size[0]
     container = np.zeros((len(paths), 3, h, w))
-    mask = np.zeros((len(paths), 1, int(h/4), int(w/4)))
+    mask = np.zeros((len(paths), 1, int(h / 4), int(w / 4)))
     for i, path in enumerate(paths):
         image = np.array(
             Image.open(path).convert('RGB'),
@@ -72,7 +72,7 @@ def calc_feats_more(*paths, size=(208, 184)):
         # change hxwxc = cxhxw
         im = np.transpose(resize_image, (2, 0, 1))
         container[i, :, :, :] = im
-        ma = np.ones([1, int(size[1]/4), int(size[0]/4)])
+        ma = np.ones([1, int(size[1] / 4), int(size[0] / 4)])
         mask[i, :, :, :] = ma
     container /= 255.
     container = torch.from_numpy(container.astype(np.float32))
@@ -86,6 +86,7 @@ def calc_feats_more(*paths, size=(208, 184)):
     # traced_script_module.save("traced_450.pt")
 
     return fv.cpu().data.numpy(), mask.cpu().data.numpy()
+
 
 def genuine_imposter(test_path):
     subs = subfolders(test_path, preserve_prefix=True)
@@ -159,7 +160,35 @@ def genuine_imposter_upright(test_path):
     mask_all = torch.from_numpy(np.concatenate(mask_all, 0)).cuda()
     matching_matrix = np.ones((nfeats, nfeats)) * 1e5
     for i in range(1, feats_all.size(0)):
-        loss = _loss(feats_all[:-i, :, :, :], mask_all[:-i, :, :, :], feats_all[i:, :, :, :], mask_all[i:, :, :, :])
+        x = feats_all[:-i, :, :, :]
+        x_mask = mask_all[:-i, :, :, :]
+        y = feats_all[i:, :, :, :]
+        y_mask = mask_all[i:, :, :, :]
+        bs, ch, he, wi = x.shape
+        loss = np.ones(bs, )*1e5
+        chuncks = 6000
+        if bs > chuncks:
+            num_chuncks = bs // chuncks
+            num_reminder = bs % chuncks
+            for nc in range(num_chuncks):
+                x_nc = x[0 + nc * chuncks:chuncks + nc * chuncks, :, :, :]
+                x_mask_nc = x_mask[0 + nc * chuncks:chuncks + nc * chuncks, :, :, :]
+                y_nc = y[0 + nc * chuncks:chuncks + nc * chuncks, :, :, :]
+                y_mask_nc = y_mask[0 + nc * chuncks:chuncks + nc * chuncks, :, :, :]
+                loss[0 + nc * chuncks:chuncks + nc * chuncks] = _loss(x_nc, x_mask_nc, y_nc, y_mask_nc)
+            if num_reminder > 0:
+                x_nc = x[chuncks + nc * chuncks:, :, :, :]
+                x_mask_nc = x_mask[chuncks + nc * chuncks:, :, :, :]
+                y_nc = y[chuncks + nc * chuncks:, :, :, :]
+                y_mask_nc = y_mask[chuncks + nc * chuncks:, :, :, :]
+                if x_nc.ndim == 3:
+                    x_nc = x_nc.unsqueeze(0)
+                    x_mask_nc = x_mask_nc.unsqueeze(0)
+                    y_nc = y_nc.unsqueeze(0)
+                    y_mask_nc = y_mask_nc.unsqueeze(0)
+                loss[chuncks + nc * chuncks:] = _loss(x_nc, x_mask_nc, y_nc, y_mask_nc)
+        else:
+            loss = _loss(feats_all[:-i, :, :, :], mask_all[:-i, :, :, :], feats_all[i:, :, :, :], mask_all[i:, :, :, :])
         matching_matrix[:-i, i] = loss
         print("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
 
@@ -201,13 +230,13 @@ parser.add_argument("--test_path", type=str,
                     default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/04/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/ssim/MaskLM_RFNet_triplet_ssim-lr0.001-r0-a1-2a20-hs0_vs0_11-24-21-04-13/output/04-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_triplet_ssim-lr0.001-r0-a0.5-2a20.0-hs0_vs0_11-25-16-27-43/output/04-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/ssim/MaskLM_RFNet_triplet_ssim-lr0.001-r0-a1-2a20-hs0_vs0_11-24-21-04-13/ckpt_epoch_3000.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_triplet_ssim-lr0.001-r0-a0.5-2a20.0-hs0_vs0_11-25-16-27-43/ckpt_epoch_3000.pth",
                     dest="model_path")
 parser.add_argument("--loss_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/ssim/MaskLM_RFNet_triplet_ssim-lr0.001-r0-a1-2a20-hs0_vs0_11-24-21-04-13/loss_ckpt_epoch_3000.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_triplet_ssim-lr0.001-r0-a0.5-2a20.0-hs0_vs0_11-25-16-27-43/loss_ckpt_epoch_3000.pth",
                     dest="loss_path")
 parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
 parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
@@ -235,8 +264,9 @@ inference.load_state_dict(torch.load(args.model_path))
 # Loss = models.loss_function.WholeRotationShiftedLoss(args.shift_size, args.shift_size, args.angle)
 # Loss = models.loss_function.MaskRSIL(args.shift_size, args.shift_size, args.rotate_angle)
 Loss = SSIM(data_range=1., size_average=False, channel=64)
-# Loss = SSIMGNN(data_range=1., size_average=False, channel=64, config={"weight": args.loss_paht})
-
+# Loss = SSIMGNN(data_range=1., size_average=False, channel=64, config={'GNN_layers': ['self', 'cross'] * 1,
+#                                                                       "weight": ''})
+# Loss.load_state_dict(torch.load(args.loss_path))
 Loss.cuda()
 Loss.eval()
 

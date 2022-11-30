@@ -8,7 +8,7 @@ from torch.autograd import Variable
 import models.loss_function
 from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel, \
     STNWithRFNet, ResidualSTNet, RFNet64
-from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
+from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL, MaskRSSSIM
 from models.pytorch_mssim import SSIM, SSIMGNN
 from torchvision import transforms
 import torchvision
@@ -168,7 +168,11 @@ class Model(object):
                 loss = SSIMGNN(data_range=1., size_average=False, channel=64, config=args.sglue_conf).cuda()
                 logging("Successfully building ssimgnn triplet loss")
             else:
-                raise RuntimeError('Please make sure your loss funtion!')
+                if args.loss_typr == "maskrsssim":
+                    loss = MaskRSSSIM(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
+                    logging("Successfully building maskrsssim triplet loss")
+                else:
+                    raise RuntimeError('Please make sure your loss funtion!')
         loss.cuda()
         loss.train()
         return inference, loss

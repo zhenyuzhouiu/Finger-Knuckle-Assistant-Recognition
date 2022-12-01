@@ -106,8 +106,7 @@ class RFNet64(torch.nn.Module):
         self.resid4 = ResidualBlock(128)
         self.conv4 = ConvLayer(128, 64, kernel_size=3, stride=1)
 
-    def forward(self, x, mask):
-        mask = mask
+    def forward(self, x):
         conv1 = F.relu(self.conv1(x))
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))
@@ -118,7 +117,7 @@ class RFNet64(torch.nn.Module):
         conv4 = F.sigmoid(self.conv4(resid4))
 
         # conv4.shape:-> [b, 64, 32, 32]
-        return conv4, mask
+        return conv4
 
 
 class RFNet64GNN(torch.nn.Module):

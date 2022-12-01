@@ -8,8 +8,8 @@ from torch.autograd import Variable
 import models.loss_function
 from models.net_model import ResidualFeatureNet, DeConvRFNet, RFNWithSTNet, ConvNet, AssistantModel, FusionModel, \
     STNWithRFNet, ResidualSTNet, RFNet64
-from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL, MaskRSSSIM
-from models.pytorch_mssim import SSIM, SSIMGNN
+from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
+from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM
 from torchvision import transforms
 import torchvision
 from torch.utils.data import DataLoader
@@ -68,7 +68,8 @@ class Model(object):
 
         if args.n_tuple in ['triplet']:
             examples = iter(train_loader)
-            example_data, example_mask, example_target = examples.next()
+            # example_data, example_mask, example_target = examples.next()
+            example_data, example_target = examples.next()
             example_anchor = example_data[:, 0:3, :, :]
             example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
                                                                                          example_anchor.size(3))
@@ -149,8 +150,8 @@ class Model(object):
         else:
             data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
             data = Variable(data, requires_grad=False)
-            mask = torch.ones([1, 32, 32]).unsqueeze(0).cuda()
-            self.writer.add_graph(inference, [data, mask])
+            # mask = torch.ones([1, 32, 32]).unsqueeze(0).cuda()
+            self.writer.add_graph(inference, [data])
         inference.cuda()
         inference.train()
 
@@ -168,16 +169,109 @@ class Model(object):
                 loss = SSIMGNN(data_range=1., size_average=False, channel=64, config=args.sglue_conf).cuda()
                 logging("Successfully building ssimgnn triplet loss")
             else:
-                if args.loss_typr == "maskrsssim":
-                    loss = MaskRSSSIM(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
-                    logging("Successfully building maskrsssim triplet loss")
+                if args.loss_type == "rsssim":
+                    loss = RSSSIM(data_range=1., size_average=False, channel=64, v_shift=args.vertical_size,
+                                  h_shift=args.horizontal_size, angle=args.rotate_angle).cuda()
+                    logging("Successfully building rsssim triplet loss")
                 else:
-                    raise RuntimeError('Please make sure your loss funtion!')
+                    raise RuntimeError('Please make sure your loss function!')
         loss.cuda()
         loss.train()
         return inference, loss
 
     def triplet_train(self, args):
+        epoch_steps = len(self.train_loader)
+        train_loss = 0
+        start_epoch = ''.join(x for x in os.path.basename(args.start_ckpt) if x.isdigit())
+        if start_epoch:
+            start_epoch = int(start_epoch) + 1
+            self.load(args.start_ckpt)
+        else:
+            start_epoch = 1
+
+        # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
+        scheduler = MultiStepLR(self.optimizer, milestones=[10, 500, 1000], gamma=0.1)
+        # for freeze spatial transformer network
+        freeze_stn = args.freeze_stn
+
+        for e in range(start_epoch, args.epochs + start_epoch):
+            # self.exp_lr_scheduler(e, lr_decay_epoch=100)
+            self.inference.train()
+            agg_loss = 0.
+            # for batch_id, (x, _) in enumerate(self.train_loader):
+            # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
+            loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
+            for batch_id, (x, _) in loop:
+                if args.model in ["RFNWithSTNet", "STNWithRFNet", "ResidualSTNet"]:
+                    if freeze_stn:
+                        for name, para in self.inference.named_parameters():
+                            if "localization" in name or "fc_loc" in name:
+                                para.requires_grad_(False)
+                    else:
+                        for name, para in self.inference.named_parameters():
+                            if "localization" in name or "fc_loc" in name:
+                                para.requires_grad_(True)
+
+                # ========================================================= train inference model
+                # x.shape :-> [b, 3*3*samples_subject, h, w]
+                x = x.cuda()
+                x = Variable(x, requires_grad=False)
+                fms = self.inference(x.view(-1, 3, x.size(2), x.size(3)))
+                bs, ch, he, wi = fms.shape
+                # (batch_size, anchor+positive+negative, 32, 32)
+                fms = fms.view(x.size(0), -1, fms.size(2), fms.size(3))
+                anchor_fm = fms[:, 0:ch, :, :]  # anchor has one sample
+                if len(anchor_fm.shape) == 3:
+                    anchor_fm.unsqueeze(1)
+                pos_fm = fms[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
+                neg_fm = fms[:, self.samples_subject * ch:, :, :].contiguous()
+                nneg = int(neg_fm.size(1) / ch)
+                neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))
+                an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
+                                    neg_fm)
+                # an_loss.shape:-> (batch_size, 10)
+                # min(1) will get min value and the corresponding indices
+                # min(1)[0]
+                an_loss = an_loss.view((-1, nneg)).min(1)[0]
+
+                npos = int(pos_fm.size(1) / ch)
+                pos_fm = pos_fm.view(-1, ch, pos_fm.size(2), pos_fm.size(3))
+                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
+                                    pos_fm)
+                ap_loss = ap_loss.view((-1, npos)).max(1)[0]
+
+                sstl = ap_loss - an_loss + args.alpha
+                sstl = torch.clamp(sstl, min=0)
+
+                loss = torch.sum(sstl) / args.batch_size
+
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                agg_loss += loss.item()
+                train_loss += loss.item()
+
+                loop.set_description(f'Epoch [{e}/{args.epochs}]')
+                loop.set_postfix(loss_inference="{:.6f}".format(agg_loss))
+
+            self.writer.add_scalar("lr", scalar_value=self.optimizer.state_dict()['param_groups'][0]['lr'],
+                                   global_step=(e + 1))
+            self.writer.add_scalar("loss_inference", scalar_value=train_loss,
+                                   global_step=((e + 1) * epoch_steps))
+
+            if agg_loss <= args.freeze_thre:
+                freeze_stn = False
+
+            train_loss = 0
+
+            if args.checkpoint_dir is not None and e % args.checkpoint_interval == 0:
+                self.save(args.checkpoint_dir, e)
+
+            scheduler.step()
+
+        self.writer.close()
+
+    def masktriplet_train(self, args):
         epoch_steps = len(self.train_loader)
         train_loss = 0
         start_epoch = ''.join(x for x in os.path.basename(args.start_ckpt) if x.isdigit())

@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.autograd.gradcheck import gradcheck
 from models.pytorch_mssim import SSIM
+from models.pytorch_mssim import ssim, _fspecial_gauss_1d
 
 torch.backends.cudnn.deterministic = True
 
@@ -134,6 +135,7 @@ class MaskRSIL(torch.nn.Module):
     forward input:->
     =============== i_fm1, i_mask1, i_fm2, i_mask2
     """
+
     def __init__(self, i_v_shift, i_h_shift, i_angle):
         super(MaskRSIL, self).__init__()
         self.v_shift = i_v_shift
@@ -189,68 +191,6 @@ class MaskRSIL(torch.nn.Module):
 
         return min_dist
 
-
-class MaskRSSSIM(torch.nn.Module):
-    """
-    initial input:
-    =============== i_v_shift, i_h_shift, and i_angle should be even numbers
-    forward input:->
-    =============== i_fm1, i_mask1, i_fm2, i_mask2
-    """
-    def __init__(self, i_v_shift, i_h_shift, i_angle):
-        super(MaskRSSSIM, self).__init__()
-        self.v_shift = i_v_shift
-        self.h_shift = i_h_shift
-        self.angle = i_angle
-        self.ssim = SSIM(data_range=1.0, channel=64)
-
-    def forward(self, i_fm1, i_mask1, i_fm2, i_mask2, i_min_or_max="min"):
-        b, c, h, w = i_fm1.shape
-        n_affine = 0
-        if self.training:
-            min_dist = torch.zeros([b, ], dtype=i_fm1.dtype, requires_grad=True, device=i_fm1.device)
-        else:
-            min_dist = torch.zeros([b, ], dtype=i_fm1.dtype, requires_grad=False, device=i_fm1.device)
-
-        if self.v_shift == self.h_shift == self.angle == 0:
-            min_dist = self.ssim(i_fm1, i_mask1, i_fm2, i_mask2)
-            return min_dist
-        for tx in range(-self.h_shift, self.h_shift + 1):
-            for ty in range(-self.v_shift, self.v_shift + 1):
-                for a in range(-self.angle, self.angle + 1):
-                    # transform i_fm1
-                    # radian_a = -(a * math.pi / 180.)
-                    # ratio_tx = -(2 * tx / w)
-                    # ratio_ty = -(2 * ty / h)
-                    # theta = generate_theta(radian_a, ratio_tx, ratio_ty, b, h, w, i_fm1.dtype).to(i_fm1.device)
-                    # grid = F.affine_grid(theta, i_fm1.size(), align_corners=False).to(i_fm1.device)
-                    # r_fm1 = F.grid_sample(i_fm1, grid, align_corners=False)
-                    # r_mask1 = F.grid_sample(i_mask1, grid, align_corners=False)
-                    # transform i_fm2
-                    radian_a = a * math.pi / 180.
-                    ratio_tx = 2 * tx / w
-                    ratio_ty = 2 * ty / h
-                    theta = generate_theta(radian_a, ratio_tx, ratio_ty, b, h, w, i_fm2.dtype).to(i_fm2.device)
-                    grid = F.affine_grid(theta, i_fm2.size(), align_corners=False).to(i_fm2.device)
-                    r_fm2 = F.grid_sample(i_fm2, grid, align_corners=False)
-                    r_mask2 = F.grid_sample(i_mask2, grid, align_corners=False)
-                    # mean_se.shape: -> (bs, )
-                    mean_ssim = self.ssim(i_fm1, i_mask1, r_fm2, r_mask2)
-                    if n_affine == 0:
-                        min_dist = mean_ssim
-                    else:
-                        min_dist = torch.vstack([min_dist, mean_ssim])
-                    n_affine += 1
-
-        if i_min_or_max == "min":
-            min_dist, _ = torch.min(min_dist, dim=0)
-        elif i_min_or_max == "max":
-            min_dist, _ = torch.max(min_dist, dim=0)
-        else:
-            raise RuntimeError(
-                "Please make sure the MaskRSSSIM loss function with right i_min_or_max")
-
-        return min_dist
 
 class ImageBlockRotationAndTranslation(torch.nn.Module):
     def __init__(self, i_block_size, i_v_shift, i_h_shift, i_angle, i_topk=16):

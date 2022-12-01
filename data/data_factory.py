@@ -237,6 +237,38 @@ class Factory(torch.utils.data.Dataset):
         anchor = randpick_list(self.fdict[selected_folder])
         positive = reminderpick_list(self.fdict[selected_folder], [anchor])
 
+        img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
+        for p in positive:
+            img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
+        for i in range(2):
+            negative_folder = randpick_list(self.subfolder_names, list_folders)
+            list_folders.append(negative_folder)
+            negative = reminderpick_list(self.fdict[negative_folder])
+            for n in negative:
+                img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
+
+        # img is the data
+        # junk is the label
+        img = np.concatenate(img, axis=-1)
+        junk = np.array([0])
+        if self.transform is not None:
+            # Converts a PIL Image or numpy.ndarray (H x W x C) in the range [0, 255]
+            # to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0]
+            # if the PIL Image belongs to one of the modes (L, LA, P, I, F, RGB, YCbCr, RGBA, CMYK, 1)
+            # or if the numpy.ndarray has dtype = np.uint8
+            # In the other cases, tensors are returned without normalization.
+            img = self.transform(img)
+
+        return img, junk
+
+    def _masktriplet_trainitems(self, index):
+        # ======================= get images and corresponding features and label
+        # Per index, per subject
+        selected_folder = self.subfolder_names[index]
+        list_folders = [selected_folder]
+        anchor = randpick_list(self.fdict[selected_folder])
+        positive = reminderpick_list(self.fdict[selected_folder], [anchor])
+
         # options = 'L' just convert image to gray image
         # img = []
         # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L'), -1))

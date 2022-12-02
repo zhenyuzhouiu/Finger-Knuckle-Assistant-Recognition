@@ -41,7 +41,7 @@ def build_parser():
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
 
     # Training StrategyResidualSTNet
-    parser.add_argument('--batch_size', type=int, dest='batch_size', default=1)
+    parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
     parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=1e-3)
 

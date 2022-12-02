@@ -87,15 +87,15 @@ class Model(object):
             examples = iter(train_loader)
             example_data, example_target = examples.next()
             example_anchor = example_data[:, 0:3, :, :]
-            example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
+            example_positive = example_data[:, 3: self.samples_subject*3, :, :].reshape(-1, 3, example_anchor.size(2),
                                                                                          example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1,
+            example_negative = example_data[:, self.samples_subject * 3:2 * 3 * self.samples_subject, :, :].reshape(-1,
                                                                                                                     3,
                                                                                                                     example_anchor.size(
                                                                                                                         2),
                                                                                                                     example_anchor.size(
                                                                                                                         3))
-            example_negative2 = example_data[:, 3 * 3 * self.samples_subject:, :, :].reshape(-1, 3,
+            example_negative2 = example_data[:, 2* 3 * self.samples_subject:, :, :].reshape(-1, 3,
                                                                                              example_anchor.size(2),
                                                                                              example_anchor.size(3))
             anchor_grid = torchvision.utils.make_grid(example_anchor)
@@ -177,7 +177,7 @@ class Model(object):
                 else:
                     raise RuntimeError('Please make sure your loss function!')
         loss.cuda()
-        loss.train()
+        loss.eval()
         return inference, loss
 
     def triplet_train(self, args):
@@ -411,29 +411,31 @@ class Model(object):
                 x = Variable(x, requires_grad=False)
                 fms = self.inference(x.view(-1, 3, x.size(2), x.size(3)))
                 # (batch_size, anchor+positive+negative, 32, 32)
+                bs, ch, he, wi = fms.shape
                 fms = fms.view(x.size(0), -1, fms.size(2), fms.size(3))
-
-                anchor_fm = fms[:, 0, :, :].unsqueeze(1)  # anchor has one sample
-                pos_fm = fms[:, 1:self.samples_subject, :, :].contiguous()
-                neg_fm = fms[:, self.samples_subject:3 * self.samples_subject, :, :].contiguous()
-                neg2_fm = fms[:, 3 * self.samples_subject:, :, :].contiguous()
+                anchor_fm = fms[:, 0:ch, :, :]  # anchor has one sample
+                if len(anchor_fm.shape) == 3:
+                    anchor_fm.unsqueeze(1)
+                pos_fm = fms[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
+                neg_fm = fms[:, self.samples_subject * ch:2 * self.samples_subject * ch, :, :].contiguous()
+                neg2_fm = fms[:, 2 * self.samples_subject * ch:, :, :].contiguous()
                 # distance anchor negative
-                nneg = neg_fm.size(1)
-                neg_fm = neg_fm.view(-1, 1, neg_fm.size(2), neg_fm.size(3))
-                an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
+                nneg = int(neg_fm.size(1) / ch)
+                neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))
+                an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
                                     neg_fm)
                 # an_loss.shape:-> (batch_size, 10)
                 # min(1) will get min value and the corresponding indices
                 # min(1)[0]
                 an_loss = an_loss.view((-1, nneg)).min(1)[0]
                 # distance anchor positive
-                npos = pos_fm.size(1)
-                pos_fm = pos_fm.view(-1, 1, pos_fm.size(2), pos_fm.size(3))
-                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
+                npos = int(pos_fm.size(1) /ch)
+                pos_fm = pos_fm.view(-1, ch, pos_fm.size(2), pos_fm.size(3))
+                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
                                     pos_fm)
                 ap_loss = ap_loss.view((-1, npos)).max(1)[0]
                 # distance negative negative2
-                neg2_fm = neg2_fm.view(-1, 1, neg2_fm.size(2), neg2_fm.size(3))
+                neg2_fm = neg2_fm.view(-1, ch, neg2_fm.size(2), neg2_fm.size(3))
                 nn_loss = self.loss(neg2_fm, neg_fm)
                 nn_loss = nn_loss.view((-1, nneg)).min(1)[0]
 

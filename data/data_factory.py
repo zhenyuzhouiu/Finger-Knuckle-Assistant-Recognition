@@ -399,14 +399,14 @@ class Factory(torch.utils.data.Dataset):
 
         # Negative samples 2 times than positive
         # the first class negative sample
-        for i in range(2):
+        for i in range(1):
             negative_folder = randpick_list(self.subfolder_names, list_folders)
             list_folders.append(negative_folder)
             negative = reminderpick_list(self.fdict[negative_folder])
             for n in negative:
                 img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
 
-        for i in range(2):
+        for i in range(1):
             negative_folder = randpick_list(self.subfolder_names, list_folders)
             list_folders.append(negative_folder)
             negative = reminderpick_list(self.fdict[negative_folder])

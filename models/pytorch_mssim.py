@@ -342,10 +342,11 @@ class RSSSIM(torch.nn.Module):
         b, c, h, w = X.shape
         mask = torch.ones_like(Y, device=Y.device)
         n_affine = 0
-        if self.training:
-            min_dist = torch.zeros([b, ], dtype=X.dtype, requires_grad=True, device=X.device)
-        else:
-            min_dist = torch.zeros([b, ], dtype=X.dtype, requires_grad=False, device=X.device)
+        min_dist = torch.zeros([b, ], dtype=X.dtype, device=X.device)
+        # if self.training:
+        #     min_dist = torch.zeros([b, ], dtype=X.dtype, requires_grad=True, device=X.device)
+        # else:
+        #     min_dist = torch.zeros([b, ], dtype=X.dtype, requires_grad=False, device=X.device)
 
         if self.v_shift == self.h_shift == self.angle == 0:
             min_dist = 1 - ssim(X, Y, data_range=self.data_range, size_average=self.size_average,
@@ -367,6 +368,7 @@ class RSSSIM(torch.nn.Module):
                         min_dist = mean_ssim
                     else:
                         min_dist = torch.vstack([min_dist, mean_ssim])
+                        # min_dist, _ = torch.min(min_dist, dim=0)
                     n_affine += 1
 
         min_dist, _ = torch.min(min_dist, dim=0)

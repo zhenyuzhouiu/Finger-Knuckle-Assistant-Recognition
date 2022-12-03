@@ -9,8 +9,8 @@ import os
 import pandas as pd
 import shutil
 
-src_path = r"C:\Users\zheny\Desktop\fp_des_score"
-dst_path = r"C:\Users\zheny\Desktop\fill_fp_des_score"
+src_path = "/media/zhenyuzhou/Data/finger_knuckle_2018/5_fusion/fp_des_score/"
+dst_path = "/media/zhenyuzhou/Data/finger_knuckle_2018/5_fusion/valid_fp_des_score/"
 if os.path.exists(dst_path):
     shutil.rmtree(dst_path)
 os.mkdir(dst_path)

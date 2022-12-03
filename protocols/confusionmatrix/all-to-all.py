@@ -231,24 +231,24 @@ def genuine_imposter_upright(test_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/04/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/01/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_16_triplet_ssim-lr0.001-r0-a0.5-2a20.0-hs0_vs0_12-01-21-08-48/output/04-protocol.npy",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.5-2a0.3-hs2_vs2_12-02-16-23-27/output/01-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_16_triplet_ssim-lr0.001-r0-a0.5-2a20.0-hs0_vs0_12-01-21-08-48/ckpt_epoch_3000.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.5-2a0.3-hs2_vs2_12-02-16-23-27/ckpt_epoch_900.pth",
                     dest="model_path")
 parser.add_argument("--loss_path", type=str,
-                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_16_triplet_ssim-lr0.001-r0-a0.5-2a20.0-hs0_vs0_12-01-21-08-48/ckpt_epoch_3000.pth",
+                    default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.5-2a0.3-hs2_vs2_12-02-16-23-27/ckpt_epoch_900.pth",
                     dest="loss_path")
 parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
-parser.add_argument("--shift_size", type=int, dest="shift_size", default=0)
+parser.add_argument("--shift_size", type=int, dest="shift_size", default=2)
 parser.add_argument('--block_size', type=int, dest="block_size", default=8)
-parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=0)
+parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=2)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-parser.add_argument('--model', type=str, dest='model', default="RFNet64_16")
+parser.add_argument('--model', type=str, dest='model', default="RFNet64")
 
 model_dict = {
     "RFNet": models.net_model.ResidualFeatureNet().cuda(),
@@ -268,9 +268,9 @@ inference = model_dict[args.model].cuda()
 inference.load_state_dict(torch.load(args.model_path))
 # Loss = models.loss_function.WholeRotationShiftedLoss(args.shift_size, args.shift_size, args.angle)
 # Loss = models.loss_function.MaskRSIL(args.shift_size, args.shift_size, args.rotate_angle)
-Loss = SSIM(data_range=1., size_average=False, channel=64)
-# Loss = RSSSIM(data_range=1., size_average=False, channel=64, v_shift=args.shift_size,
-#               h_shift=args.shift_size, angle=args.rotate_angle)
+# Loss = SSIM(data_range=1., size_average=False, channel=64)
+Loss = RSSSIM(data_range=1., size_average=False, channel=64, v_shift=args.shift_size,
+              h_shift=args.shift_size, angle=args.rotate_angle)
 # Loss = SSIMGNN(data_range=1., size_average=False, channel=64, config={'GNN_layers': ['self', 'cross'] * 1,
 #                                                                       "weight": ''})
 # Loss.load_state_dict(torch.load(args.loss_path))

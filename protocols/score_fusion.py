@@ -334,10 +334,14 @@ if __name__ == "__main__":
              '#000000',
              "#c0c0c0"]
 
-    cls = ["01", "02", "03", "07", "08", "09"]
+    cls = ["01", "02", "04", "05", "06", "07", "08", "09"]
 
-    fk_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fk_score/"
-    fp_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fp_score/"
-    dynamic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/dynamic/"
-    holistic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/holistic/"
-    nonlinear_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/nonlinear/"
+    fk_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/fk_score/"
+    fp_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/valid_fp_score/"
+    dynamic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/dynamic/"
+    holistic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/holistic/"
+    nonlinear_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/nonlinear/"
+
+    # dynamic(cls, fk_score_path, fp_score_path, dynamic_save_path, label, color)
+    # holistic(cls, fk_score_path, fp_score_path, holistic_save_path, label, color)
+    nonlinear(cls, fk_score_path, fp_score_path, nonlinear_save_path, label, color)

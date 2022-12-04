@@ -1,4 +1,6 @@
 import os
+import shutil
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -36,7 +38,7 @@ def get_score(matching_matrix):
             g_scores += list(matching_matrix[i, g_select])
         if len(i_select) != 0:
             i_scores += list(matching_matrix[i, i_select])
-    return g_scores, i_scores
+    return np.array(g_scores), np.array(i_scores)
 
 
 def draw_roc(scores, save_path, label, color):
@@ -102,7 +104,6 @@ def dynamic(cls, fk_score_path, fp_score_path, dynamic_save_path, label, color):
         max = np.max(np.array([g_max, i_max]))
         min = np.min(np.array([g_min, i_min]))
         fk_matrix = (fk_matrix - min) / (max - min)
-
         fk_g_scores, fk_i_scores = get_score(fk_matrix)
 
         # ---------------------- read fp score and normalize
@@ -111,53 +112,56 @@ def dynamic(cls, fk_score_path, fp_score_path, dynamic_save_path, label, color):
         fp_matrix = fp_score.values.tolist()
         fp_matrix = np.array(fp_matrix).astype(np.float)
         fp_g_scores, fp_i_scores = get_score(fp_matrix)
-        fp_g_valid = []
-        for i in fp_g_scores:
-            if i >= 0:
-                fp_g_valid.append(i)
-        fp_i_valid = []
-        for i in fp_i_scores:
-            if i >= 0:
-                fp_i_valid.append(i)
+        fp_g_valid, fp_i_valid = [], []
+        for i in range(len(fp_g_scores)):
+            if fp_g_scores[i] < 0:
+                continue
+            else:
+                fp_g_valid.append(fp_g_scores[i])
+        for i in range(len(fp_i_scores)):
+            if fp_i_scores[i] < 0:
+                continue
+            else:
+                fp_i_valid.append(fp_i_scores[i])
         fp_g_valid, fp_i_valid = np.array(fp_g_valid), np.array(fp_i_valid)
         g_min = np.min(fp_g_valid)
         g_max = np.max(fp_g_valid)
         i_min = np.min(fp_i_valid)
         i_max = np.max(fp_i_valid)
-        # normalize score
         max = np.max(np.array([g_max, i_max]))
         min = np.min(np.array([g_min, i_min]))
         fp_matrix = (fp_matrix - min) / (max - min)
         fp_g_scores, fp_i_scores = get_score(fp_matrix)
-        # fp_g_valid for draw fp curve
-        # fp_g_scores for score fusion
-        fp_g_valid = []
+        fp_g_valid, fp_i_valid = [], []
         for i in range(len(fp_g_scores)):
-            if fp_g_scores[i] >= 0:
+            if fp_g_scores[i] < 0:
+                fp_g_valid.append(1)
+            else:
                 fp_g_valid.append(fp_g_scores[i])
-            else:
-                fp_g_scores[i] = fk_g_scores[i]
-        fp_i_valid = []
         for i in range(len(fp_i_scores)):
-            if fp_i_scores[i] >= 0:
-                fp_i_valid.append(fp_i_scores[i])
+            if fp_i_scores[i] < 0:
+                fp_i_valid.append(1)
             else:
-                fp_i_scores[i] = fk_i_scores[i]
+                fp_i_valid.append(fp_i_scores[i])
+        fp_g_scores, fp_i_scores = np.array(fp_g_valid), np.array(fp_i_valid)
 
         eer = []
-        for w in range(0, 100, 5):
-            w = w / 100
-            w2 = 1 - w
-            dynamic_g = (w * np.array(fk_g_scores) + w2 * np.array(fp_g_scores)).tolist()
-            dynamic_i = (w * np.array(fk_i_scores) + w2 * np.array(fp_i_scores)).tolist()
-            dynamic_save_file = os.path.join(dynamic_save_subject, str(w) + '-' + str(1 - w) + '.pdf')
-            l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_valid, fp_i_valid], [dynamic_g, dynamic_i]],
+        for w in range(0, 105, 5):
+            w1 = round(w / 100, 2)
+            w2 = round((100 - w) / 100, 2)
+            dynamic_g = w1 * fk_g_scores + w2 * fp_g_scores
+            dynamic_i = w1 * fk_i_scores + w2 * fp_i_scores
+            dynamic_save_file = os.path.join(dynamic_save_subject, str(w1) + '-' + str(w2) + '.pdf')
+            l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [dynamic_g, dynamic_i]],
                              save_path=dynamic_save_file, label=label, color=color)
             eer.append(l_eer[2])
 
         eer = np.array(eer).astype(np.float)
         min_eer = np.min(eer)
         min_index = np.where(eer == min_eer)
+        with open(dynamic_save_path+ '/log.txt', 'a+') as f:
+            f.write("For the cls " + str(c) + ": min err value: " + str(min_eer) + " min eer value index: " + str(
+            min_index) + '\n')
         print("For the cls " + str(c) + ": min err value: " + str(min_eer) + " min eer value index: " + str(
             min_index) + '\n')
 
@@ -192,12 +196,12 @@ def holistic(cls, fk_score_path, fp_score_path, holistic_save_path, label, color
         fp_matrix = np.array(fp_matrix).astype(np.float)
         fp_g_scores, fp_i_scores = get_score(fp_matrix)
         fp_g_valid = []
-        for i in fp_g_scores:
-            if i >= 0:
+        for i in range(len(fp_g_scores)):
+            if fp_g_scores[i] >= 0:
                 fp_g_valid.append(i)
         fp_i_valid = []
-        for i in fp_i_scores:
-            if i >= 0:
+        for i in range(len(fp_i_scores)):
+            if fp_i_scores[i] >= 0:
                 fp_i_valid.append(i)
         fp_g_valid, fp_i_valid = np.array(fp_g_valid), np.array(fp_i_valid)
         g_min = np.min(fp_g_valid)
@@ -209,39 +213,39 @@ def holistic(cls, fk_score_path, fp_score_path, holistic_save_path, label, color
         min = np.min(np.array([g_min, i_min]))
         fp_matrix = (fp_matrix - min) / (max - min)
         fp_g_scores, fp_i_scores = get_score(fp_matrix)
-        # fp_g_valid for draw fp curve
-        # fp_g_scores for score fusion
-        fp_g_valid = []
+        fp_g_valid, fp_i_valid = [], []
         for i in range(len(fp_g_scores)):
-            if fp_g_scores[i] >= 0:
+            if fp_g_scores[i] < 0:
+                fp_g_valid.append(1)
+            else:
                 fp_g_valid.append(fp_g_scores[i])
-            else:
-                fp_g_scores[i] = fk_g_scores[i]
-        fp_i_valid = []
         for i in range(len(fp_i_scores)):
-            if fp_i_scores[i] >= 0:
-                fp_i_valid.append(fp_i_scores[i])
+            if fp_i_scores[i] < 0:
+                fp_i_valid.append(1)
             else:
-                fp_i_scores[i] = fk_i_scores[i]
+                fp_i_valid.append(fp_i_scores[i])
+        fp_g_scores, fp_i_scores = np.array(fp_g_valid), np.array(fp_i_valid)
 
         eer = []
-        for w in range(0, 100, 5):
-            w = w / 100
-            w2 = 1 - w
-            holistic_g = ((w*np.array(fk_g_scores) + w2*np.array(fp_g_scores)) *
-                          (1 + 1 / (2 - np.array(fp_g_scores)))).tolist()
-            holistic_i = ((w * np.array(fk_i_scores) + w2 * np.array(fp_i_scores)) *
-                          (1 + 1 / (2 - np.array(fp_i_scores)))).tolist()
-            holistic_save_file = os.path.join(holistic_save_subject, str(w) + '-' + str(1 - w) + '.pdf')
-            l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_valid, fp_i_valid], [holistic_g, holistic_i]],
+        for w in range(0, 105, 5):
+            w1 = round(w / 100, 2)
+            w2 = round((100 - w) / 100, 2)
+            holistic_g = (w1 * fk_g_scores + w2 * fp_g_scores) * (1 + 1 / (2 - fp_g_scores))
+            holistic_i = (w1 * fk_i_scores + w2 * fp_i_scores) * (1 + 1 / (2 - fp_i_scores))
+            holistic_save_file = os.path.join(holistic_save_subject, str(w1) + '-' + str(w2) + '.pdf')
+            l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [holistic_g, holistic_i]],
                              save_path=holistic_save_file, label=label, color=color)
             eer.append(l_eer[2])
 
         eer = np.array(eer).astype(np.float)
         min_eer = np.min(eer)
         min_index = np.where(eer == min_eer)
+        with open(holistic_save_path + '/log.txt', 'a+') as f:
+            f.write("For the cls " + str(c) + ": min err value: " + str(min_eer) + " min eer value index: " + str(
+            min_index) + '\n')
         print("For the cls " + str(c) + ": min err value: " + str(min_eer) + " min eer value index: " + str(
             min_index) + '\n')
+
 
 def nonlinear(cls, fk_score_path, fp_score_path, nonlinear_save_path, label, color):
     for c in cls:
@@ -273,13 +277,13 @@ def nonlinear(cls, fk_score_path, fp_score_path, nonlinear_save_path, label, col
         fp_matrix = np.array(fp_matrix).astype(np.float)
         fp_g_scores, fp_i_scores = get_score(fp_matrix)
         fp_g_valid = []
-        for i in fp_g_scores:
-            if i >= 0:
-                fp_g_valid.append(i)
+        for i in range(len(fp_g_scores)):
+            if fp_g_scores[i] >= 0:
+                fp_g_valid.append(fp_g_scores[i])
         fp_i_valid = []
-        for i in fp_i_scores:
-            if i >= 0:
-                fp_i_valid.append(i)
+        for i in range(len(fp_i_scores)):
+            if fp_i_scores[i] >= 0:
+                fp_i_valid.append(fp_i_scores[i])
         fp_g_valid, fp_i_valid = np.array(fp_g_valid), np.array(fp_i_valid)
         g_min = np.min(fp_g_valid)
         g_max = np.max(fp_g_valid)
@@ -290,37 +294,38 @@ def nonlinear(cls, fk_score_path, fp_score_path, nonlinear_save_path, label, col
         min = np.min(np.array([g_min, i_min]))
         fp_matrix = (fp_matrix - min) / (max - min)
         fp_g_scores, fp_i_scores = get_score(fp_matrix)
-        # fp_g_valid for draw fp curve
-        # fp_g_scores for score fusion
-        fp_g_valid = []
+        fp_g_valid, fp_i_valid = [], []
         for i in range(len(fp_g_scores)):
-            if fp_g_scores[i] >= 0:
+            if fp_g_scores[i] < 0:
+                fp_g_valid.append(1)
+            else:
                 fp_g_valid.append(fp_g_scores[i])
-            else:
-                fp_g_scores[i] = fk_g_scores[i]
-        fp_i_valid = []
         for i in range(len(fp_i_scores)):
-            if fp_i_scores[i] >= 0:
-                fp_i_valid.append(fp_i_scores[i])
+            if fp_i_scores[i] < 0:
+                fp_i_valid.append(1)
             else:
-                fp_i_scores[i] = fk_i_scores[i]
+                fp_i_valid.append(fp_i_scores[i])
+        fp_g_scores, fp_i_scores = np.array(fp_g_valid), np.array(fp_i_valid)
 
         eer = []
-        for w in range(0, 100, 5):
-            w = w / 100
-            w2 = 1 - w
-            nonlinear_g = (np.power((1 + np.array(fk_g_scores)) / (1 + np.array(fp_g_scores)), w) * np.power(
-                (1 + np.array(fp_g_scores)), 2)).tolist()
-            nonlinear_i = (np.power((1 + np.array(fk_i_scores)) / (1 + np.array(fp_i_scores)), w) * np.power(
-                (1 + np.array(fp_i_scores)), 2)).tolist()
-            nonlinear_save_file = os.path.join(nonlinear_save_subject, str(w) + '-' + str(1 - w) + '.pdf')
-            l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_valid, fp_i_valid], [nonlinear_g, nonlinear_i]],
+        for w in range(0, 105, 5):
+            w1 = round(w / 100, 2) + 1
+            w2 = round((100 - w)/100, 2)
+            nonlinear_g = np.power((1 + fk_g_scores) / (1 + fp_g_scores), w1) * np.power(
+                (1 + fp_g_scores), 2)
+            nonlinear_i = np.power((1 + fk_i_scores) / (1 + fp_i_scores), w) * np.power(
+                (1 + fp_i_scores), 2)
+            nonlinear_save_file = os.path.join(nonlinear_save_subject, str(w1) + '-' + str(w2) + '.pdf')
+            l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [nonlinear_g, nonlinear_i]],
                              save_path=nonlinear_save_file, label=label, color=color)
             eer.append(l_eer[2])
 
         eer = np.array(eer).astype(np.float)
         min_eer = np.min(eer)
         min_index = np.where(eer == min_eer)
+        with open(nonlinear_save_path + '/log.txt', 'a+') as f:
+            f.write("For the cls " + str(c) + ": min err value: " + str(min_eer) + " min eer value index: " + str(
+            min_index) + '\n')
         print("For the cls " + str(c) + ": min err value: " + str(min_eer) + " min eer value index: " + str(
             min_index) + '\n')
 
@@ -334,14 +339,23 @@ if __name__ == "__main__":
              '#000000',
              "#c0c0c0"]
 
-    cls = ["01", "02", "04", "05", "06", "07", "08", "09"]
+    cls = ["01", "02", "04", "05", "06", "07", "08", "09", "10"]
 
     fk_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/fk_score/"
     fp_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/valid_fp_score/"
     dynamic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/dynamic/"
+    if os.path.exists(dynamic_save_path):
+        shutil.rmtree(dynamic_save_path)
+    os.mkdir(dynamic_save_path)
     holistic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/holistic/"
+    if os.path.exists(holistic_save_path):
+        shutil.rmtree(holistic_save_path)
+    os.mkdir(holistic_save_path)
     nonlinear_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/nonlinear/"
+    if os.path.exists(nonlinear_save_path):
+        shutil.rmtree(nonlinear_save_path)
+    os.mkdir(nonlinear_save_path)
 
-    # dynamic(cls, fk_score_path, fp_score_path, dynamic_save_path, label, color)
-    # holistic(cls, fk_score_path, fp_score_path, holistic_save_path, label, color)
+    dynamic(cls, fk_score_path, fp_score_path, dynamic_save_path, label, color)
+    holistic(cls, fk_score_path, fp_score_path, holistic_save_path, label, color)
     nonlinear(cls, fk_score_path, fp_score_path, nonlinear_save_path, label, color)

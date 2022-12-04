@@ -36,7 +36,7 @@ for f in files:
             i_loc = (sub - 1) * 5 + sam - 1
             if index not in df.columns:
                 # insert column into DataFrame
-                df.insert(i_loc, index, ["-1"]*rows, allow_duplicates=False)
+                df.insert(i_loc, index, ["1"]*rows, allow_duplicates=False)
                 print(f+" don't have "+index+'\n')
     df = df.T
     rows = len(df.index)
@@ -48,7 +48,7 @@ for f in files:
             i_loc = (sub - 1) * 5 + sam - 1
             if index not in df.columns:
                 # insert column into DataFrame
-                df.insert(i_loc, index, ["-1"]*rows, allow_duplicates=False)
+                df.insert(i_loc, index, ["1"]*rows, allow_duplicates=False)
 
     df = df.T
     df.to_csv(dst_csv_file)

@@ -97,6 +97,7 @@ def _ssim(X, Y, data_range, win, size_average=True, K=(0.01, 0.03)):
     C2 = (K2 * data_range) ** 2
 
     win = win.to(X.device, dtype=X.dtype)
+    # win = Variable(win, requires_grad=False)
 
     mu1 = gaussian_filter(X, win)
     mu2 = gaussian_filter(Y, win)

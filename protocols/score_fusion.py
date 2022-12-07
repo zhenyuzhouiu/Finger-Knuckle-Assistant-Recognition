@@ -198,11 +198,11 @@ def holistic(cls, fk_score_path, fp_score_path, holistic_save_path, label, color
         fp_g_valid = []
         for i in range(len(fp_g_scores)):
             if fp_g_scores[i] >= 0:
-                fp_g_valid.append(i)
+                fp_g_valid.append(fp_g_scores[i])
         fp_i_valid = []
         for i in range(len(fp_i_scores)):
             if fp_i_scores[i] >= 0:
-                fp_i_valid.append(i)
+                fp_i_valid.append(fp_i_scores[i])
         fp_g_valid, fp_i_valid = np.array(fp_g_valid), np.array(fp_i_valid)
         g_min = np.min(fp_g_valid)
         g_max = np.max(fp_g_valid)
@@ -229,7 +229,7 @@ def holistic(cls, fk_score_path, fp_score_path, holistic_save_path, label, color
         eer = []
         for w in range(0, 105, 5):
             w1 = round(w / 100, 2)
-            w2 = round((100 - w) / 100, 2)
+            w2 = round(1-w1, 2)
             holistic_g = (w1 * fk_g_scores + w2 * fp_g_scores) * (1 + 1 / (2 - fp_g_scores))
             holistic_i = (w1 * fk_i_scores + w2 * fp_i_scores) * (1 + 1 / (2 - fp_i_scores))
             holistic_save_file = os.path.join(holistic_save_subject, str(w1) + '-' + str(w2) + '.pdf')
@@ -310,10 +310,10 @@ def nonlinear(cls, fk_score_path, fp_score_path, nonlinear_save_path, label, col
         eer = []
         for w in range(0, 105, 5):
             w1 = round(w / 100, 2) + 1
-            w2 = round((100 - w)/100, 2)
+            w2 = round(1-w1, 2)
             nonlinear_g = np.power((1 + fk_g_scores) / (1 + fp_g_scores), w1) * np.power(
                 (1 + fp_g_scores), 2)
-            nonlinear_i = np.power((1 + fk_i_scores) / (1 + fp_i_scores), w) * np.power(
+            nonlinear_i = np.power((1 + fk_i_scores) / (1 + fp_i_scores), w1) * np.power(
                 (1 + fp_i_scores), 2)
             nonlinear_save_file = os.path.join(nonlinear_save_subject, str(w1) + '-' + str(w2) + '.pdf')
             l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [nonlinear_g, nonlinear_i]],

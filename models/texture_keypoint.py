@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
+from torch.autograd import Variable
 
 
 def featureL2Norm(feature):
@@ -18,6 +19,7 @@ class FeatureExtraction(torch.nn.Module):
     github: https://github.com/ignacio-rocco/cnngeometric_pytorch
     paper: Convolutional neural network architecture for geometric matching
     """
+
     def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=True, last_layer='', use_cuda=True):
         super(FeatureExtraction, self).__init__()
         self.normalization = normalization
@@ -127,7 +129,7 @@ class FeatureCorrelation(torch.nn.Module):
 
 
 if __name__ == "__main__":
-    image_batch = torch.range(0, 128*128).view(1, 1, 128, 128).repeat(1, 3, 1, 1)
-    image_batch.cuda()
-    fe = FeatureExtraction()
+    image_batch = torch.arange(0, 128 * 128, dtype=torch.float).view(1, 1, 128, 128).repeat(1, 3, 1, 1).cuda()
+    image_batch = Variable(image_batch, requires_grad=False)
+    fe = FeatureExtraction().eval()
     features = fe(image_batch)

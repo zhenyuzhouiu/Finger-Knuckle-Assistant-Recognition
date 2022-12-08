@@ -5,7 +5,7 @@ from tqdm import tqdm
 import torchvision.utils
 from torch.autograd import Variable
 
-from vgg16 import FeatureExtraction, FeatureCorrelation
+from models.vgg16 import FeatureExtraction, FeatureCorrelation
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM
 from torchvision import transforms
 import torchvision
@@ -27,8 +27,8 @@ class Model(object):
         self.writer = writer
         self.batch_size = args.batch_size
         self.samples_subject = args.samples_subject
-        self.train_loader, self.dataset_size = self._build_dataset_loader(args)
-        self.inference, self.loss_t, self.loss_k = self._build_model(args)
+        self.train_loader, self.dataset_size = self._build_dataset_loader()
+        self.inference, self.loss_t, self.loss_k = self._build_model()
         self.optimizer = torch.optim.Adam(self.inference.parameters(), args.learning_rate)
 
     def _build_dataset_loader(self):
@@ -130,8 +130,8 @@ class Model(object):
                 x = Variable(x, requires_grad=False)
                 fms32, fms8 = self.inference(x.view(-1, 3, x.size(2), x.size(3)))
                 # (batch_size, anchor+positive+negative, 32, 32)
-                bs, ch, he, wi = fms32.shape
                 # -------------------------------------------------- texture loss
+                bs, ch, he, wi = fms32.shape
                 fms32 = fms32.view(x.size(0), -1, fms32.size(2), fms32.size(3))
                 anchor_fm = fms32[:, 0:ch, :, :]  # anchor has one sample
                 if len(anchor_fm.shape) == 3:
@@ -161,6 +161,7 @@ class Model(object):
                                   F.relu(ap_loss - nn_loss + self.args.alpha2)
                 loss_t = torch.sum(quadruplet_ssim) / self.args.batch_size
                 # --------------------------------------------------- keypoint loss
+                bs, ch, he, wi = fms8.shape
                 fms8 = fms8.view(x.size(0), -1, fms8.size(2), fms8.size(3))
                 anchor_fm = fms8[:, 0:ch, :, :]  # anchor has one sample
                 if len(anchor_fm.shape) == 3:

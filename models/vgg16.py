@@ -20,7 +20,8 @@ class FeatureExtraction(torch.nn.Module):
     paper: Convolutional neural network architecture for geometric matching
     """
 
-    def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=True, last_layer='', use_cuda=True):
+    def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=True,
+                 last_layer=['relu3_3', 'relu5_3'], use_cuda=True):
         super(FeatureExtraction, self).__init__()
         self.normalization = normalization
         if feature_extraction_cnn == 'vgg':
@@ -33,8 +34,20 @@ class FeatureExtraction(torch.nn.Module):
                                   'conv5_1', 'relu5_1', 'conv5_2', 'relu5_2', 'conv5_3', 'relu5_3', 'pool5']
             if last_layer == '':
                 last_layer = 'pool4'
-            last_layer_idx = vgg_feature_layers.index(last_layer)
-            self.model = nn.Sequential(*list(self.model.features.children())[:last_layer_idx + 1])
+                last_layer_idx = vgg_feature_layers.index(last_layer)
+                self.model = nn.Sequential(*list(self.model.features.children())[:last_layer_idx + 1])
+            elif len(last_layer) == 1:
+                last_layer_idx = vgg_feature_layers.index(last_layer)
+                self.model = nn.Sequential(*list(self.model.features.children())[:last_layer_idx + 1])
+            else:
+                if len(last_layer) != 2:
+                    raise RuntimeError("Please make sure 'last_layer' is a correct input")
+                self.two = True
+                index32 = vgg_feature_layers.index(last_layer[0])
+                self.feature32 = nn.Sequential(*list(self.model.features.children())[:index32 + 1])
+                index8 = vgg_feature_layers.index(last_layer[1])
+                self.feature8 = nn.Sequential(*list(self.model.features.children())[index32 + 1:index8 + 1])
+
         if feature_extraction_cnn == 'resnet101':
             self.model = models.resnet101(pretrained=True)
             resnet_feature_layers = ['conv1',
@@ -70,17 +83,31 @@ class FeatureExtraction(torch.nn.Module):
             self.model = nn.Sequential(*list(self.model.features.children())[:-4])
         if not train_fe:
             # freeze parameters
-            for param in self.model.parameters():
-                param.requires_grad = False
+            if self.two:
+                for param in self.feature32.parameters():
+                    param.requires_grad = False
+                for param in self.feature8.parameters():
+                    param.requires_grad = False
+            else:
+                for param in self.model.parameters():
+                    param.requires_grad = False
         # move to GPU
         if use_cuda:
             self.model = self.model.cuda()
 
     def forward(self, image_batch):
-        features = self.model(image_batch)
-        if self.normalization:
-            features = featureL2Norm(features)
-        return features
+        if self.two:
+            features32 = self.feature32(image_batch)
+            features8 = self.feature8(features32)
+            if self.normalization:
+                features32 = featureL2Norm(features32)
+                features8 = featureL2Norm(features8)
+            return features32, features8
+        else:
+            features = self.model(image_batch)
+            if self.normalization:
+                features = featureL2Norm(features)
+            return features
 
 
 class FeatureCorrelation(torch.nn.Module):
@@ -118,8 +145,12 @@ class FeatureCorrelation(torch.nn.Module):
 
             if self.normalization:
                 correlation_tensor = featureL2Norm(self.ReLU(correlation_tensor))
+            bs, ch, he, we = correlation_tensor.shape
+            # pixel_matching.shape:-> [b, 8, 8]
+            pixel_matching, _ = torch.max(correlation_tensor, dim=1)
+            matching_score = torch.sum(pixel_matching.view(bs, -1), dim=1) / (he * we)
 
-            return correlation_tensor
+            return 1 - matching_score
 
         if self.matching_type == 'subtraction':
             return feature_A.sub(feature_B)

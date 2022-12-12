@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 from torch.autograd import Variable
+from loss.sinkhorn import *
 
 
 def featureL2Norm(feature):
@@ -146,11 +147,15 @@ class FeatureCorrelation(torch.nn.Module):
             if self.normalization:
                 correlation_tensor = featureL2Norm(self.ReLU(correlation_tensor))
             bs, ch, he, we = correlation_tensor.shape
-            # pixel_matching.shape:-> [b, 8, 8]
-            pixel_matching, _ = torch.max(correlation_tensor, dim=1)
-            matching_score = torch.sum(pixel_matching.view(bs, -1), dim=1) / (he * we)
+            # transform the correlation_tensor to correlation_matrix
+            # correlation_matrix.shape:-> [b, 64, 64]
+            correlation_matrix = correlation_tensor.view(bs, ch, -1)
 
-            return 1 - matching_score
+
+
+
+
+            return 0
 
         if self.matching_type == 'subtraction':
             return feature_A.sub(feature_B)

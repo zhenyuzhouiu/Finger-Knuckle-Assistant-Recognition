@@ -42,46 +42,6 @@ class Model(object):
         logging("Successfully Load {} as training dataset...".format(self.args.train_path))
         train_loader = DataLoader(dataset=train_dataset, batch_size=self.args.batch_size, shuffle=True, num_workers=4)
 
-        if self.args.n_tuple in ['triplet']:
-            examples = iter(train_loader)
-            # example_data, example_mask, example_target = examples.next()
-            example_data, example_target = examples.next()
-            example_anchor = example_data[:, 0:3, :, :]
-            example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
-                                                                                         example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:, :, :].reshape(-1, 3, example_anchor.size(2),
-                                                                                        example_anchor.size(3))
-            anchor_grid = torchvision.utils.make_grid(example_anchor)
-            self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
-            positive_grid = torchvision.utils.make_grid(example_positive)
-            self.writer.add_image(tag="positive", img_tensor=positive_grid)
-            negative_grid = torchvision.utils.make_grid(example_negative)
-            self.writer.add_image(tag="negative", img_tensor=negative_grid)
-        else:
-            # for showing quadruplet
-            examples = iter(train_loader)
-            example_data, example_target = examples.next()
-            example_anchor = example_data[:, 0:3, :, :]
-            example_positive = example_data[:, 3: self.samples_subject * 3, :, :].reshape(-1, 3, example_anchor.size(2),
-                                                                                          example_anchor.size(3))
-            example_negative = example_data[:, self.samples_subject * 3:2 * 3 * self.samples_subject, :, :].reshape(-1,
-                                                                                                                    3,
-                                                                                                                    example_anchor.size(
-                                                                                                                        2),
-                                                                                                                    example_anchor.size(
-                                                                                                                        3))
-            example_negative2 = example_data[:, 2 * 3 * self.samples_subject:, :, :].reshape(-1, 3,
-                                                                                             example_anchor.size(2),
-                                                                                             example_anchor.size(3))
-            anchor_grid = torchvision.utils.make_grid(example_anchor)
-            self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
-            positive_grid = torchvision.utils.make_grid(example_positive)
-            self.writer.add_image(tag="positive", img_tensor=positive_grid)
-            negative_grid = torchvision.utils.make_grid(example_negative)
-            self.writer.add_image(tag="negative", img_tensor=negative_grid)
-            negative2_grid = torchvision.utils.make_grid(example_negative2)
-            self.writer.add_image(tag="negative2", img_tensor=negative2_grid)
-
         return train_loader, len(train_dataset)
 
     def exp_lr_scheduler(self, epoch, lr_decay=0.1, lr_decay_epoch=100):
@@ -134,66 +94,9 @@ class Model(object):
                 x = Variable(x, requires_grad=False)
                 fms32, fms8 = self.inference(x.view(-1, 3, x.size(2), x.size(3)))
                 # (batch_size, anchor+positive+negative, 32, 32)
-                # -------------------------------------------------- texture loss
-                bs, ch, he, wi = fms32.shape
-                fms32 = fms32.view(x.size(0), -1, fms32.size(2), fms32.size(3))
-                anchor_fm = fms32[:, 0:ch, :, :]  # anchor has one sample
-                if len(anchor_fm.shape) == 3:
-                    anchor_fm.unsqueeze(1)
-                pos_fm = fms32[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
-                neg_fm = fms32[:, self.samples_subject * ch:2 * self.samples_subject * ch, :, :].contiguous()
-                neg2_fm = fms32[:, 2 * self.samples_subject * ch:, :, :].contiguous()
-                # distance anchor negative
-                nneg = int(neg_fm.size(1) / ch)
-                neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))
-                an_loss = self.loss_t(
-                    anchor_fm.repeat(1, nneg, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
-                    neg_fm)
-                an_loss = an_loss.view((-1, nneg)).min(1)[0]
-                # distance anchor positive
-                npos = int(pos_fm.size(1) / ch)
-                pos_fm = pos_fm.view(-1, ch, pos_fm.size(2), pos_fm.size(3))
-                ap_loss = self.loss_t(
-                    anchor_fm.repeat(1, npos, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
-                    pos_fm)
-                ap_loss = ap_loss.view((-1, npos)).max(1)[0]
-                # distance negative negative2
-                neg2_fm = neg2_fm.view(-1, ch, neg2_fm.size(2), neg2_fm.size(3))
-                nn_loss = self.loss_t(neg2_fm, neg_fm)
-                nn_loss = nn_loss.view((-1, nneg)).min(1)[0]
-                quadruplet_ssim = F.relu(ap_loss - an_loss + self.args.alpha) + \
-                                  F.relu(ap_loss - nn_loss + self.args.alpha2)
-                loss_t = torch.sum(quadruplet_ssim) / self.args.batch_size
-                # --------------------------------------------------- keypoint loss
-                bs, ch, he, wi = fms8.shape
-                fms8 = fms8.view(x.size(0), -1, fms8.size(2), fms8.size(3))
-                anchor_fm = fms8[:, 0:ch, :, :]  # anchor has one sample
-                if len(anchor_fm.shape) == 3:
-                    anchor_fm.unsqueeze(1)
-                pos_fm = fms8[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
-                neg_fm = fms8[:, self.samples_subject * ch:2 * self.samples_subject * ch, :, :].contiguous()
-                neg2_fm = fms8[:, 2 * self.samples_subject * ch:, :, :].contiguous()
-                # distance anchor negative
-                nneg = int(neg_fm.size(1) / ch)
-                neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))
-                an_loss = self.loss_k(
-                    anchor_fm.repeat(1, nneg, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
-                    neg_fm)
-                an_loss = an_loss.view((-1, nneg)).min(1)[0]
-                # distance anchor positive
-                npos = int(pos_fm.size(1) / ch)
-                pos_fm = pos_fm.view(-1, ch, pos_fm.size(2), pos_fm.size(3))
-                ap_loss = self.loss_k(
-                    anchor_fm.repeat(1, npos, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
-                    pos_fm)
-                ap_loss = ap_loss.view((-1, npos)).max(1)[0]
-                # distance negative negative2
-                neg2_fm = neg2_fm.view(-1, ch, neg2_fm.size(2), neg2_fm.size(3))
-                nn_loss = self.loss_k(neg2_fm, neg_fm)
-                nn_loss = nn_loss.view((-1, nneg)).min(1)[0]
-                quadruplet_cor = F.relu(ap_loss - an_loss + self.args.alpha) + \
-                                 F.relu(ap_loss - nn_loss + self.args.alpha2)
-                loss_k = torch.sum(quadruplet_cor) / self.args.batch_size
+                b, c, h, w = x.shape
+                loss_t = self.texture_loss(fms32, batch_size=b)
+                loss_k = self.keypoint_loss(fms8, batch_size=b)
 
                 loss = loss_t + loss_k
                 loss.backward()
@@ -243,3 +146,71 @@ class Model(object):
     def load(self, checkpoint_dir):
         self.inference.load_state_dict(torch.load(checkpoint_dir))
         self.inference.cuda()
+
+    def texture_loss(self, fms32, batch_size):
+        # -------------------------------------------------- texture loss
+        bs, ch, he, wi = fms32.shape
+        fms32 = fms32.view(batch_size, -1, fms32.size(2), fms32.size(3))
+        anchor_fm = fms32[:, 0:ch, :, :]  # anchor has one sample
+        if len(anchor_fm.shape) == 3:
+            anchor_fm.unsqueeze(1)
+        pos_fm = fms32[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
+        neg_fm = fms32[:, self.samples_subject * ch:2 * self.samples_subject * ch, :, :].contiguous()
+        neg2_fm = fms32[:, 2 * self.samples_subject * ch:, :, :].contiguous()
+        # distance anchor negative
+        nneg = int(neg_fm.size(1) / ch)
+        neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))
+        an_loss = self.loss_t(
+            anchor_fm.repeat(1, nneg, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
+            neg_fm)
+        an_loss = an_loss.view((-1, nneg)).min(1)[0]
+        # distance anchor positive
+        npos = int(pos_fm.size(1) / ch)
+        pos_fm = pos_fm.view(-1, ch, pos_fm.size(2), pos_fm.size(3))
+        ap_loss = self.loss_t(
+            anchor_fm.repeat(1, npos, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
+            pos_fm)
+        ap_loss = ap_loss.view((-1, npos)).max(1)[0]
+        # distance negative negative2
+        neg2_fm = neg2_fm.view(-1, ch, neg2_fm.size(2), neg2_fm.size(3))
+        nn_loss = self.loss_t(neg2_fm, neg_fm)
+        nn_loss = nn_loss.view((-1, nneg)).min(1)[0]
+        quadruplet_ssim = F.relu(ap_loss - an_loss + self.args.alpha) + \
+                          F.relu(ap_loss - nn_loss + self.args.alpha2)
+        loss_t = torch.sum(quadruplet_ssim) / self.args.batch_size
+
+        return loss_t
+
+    def keypoint_loss(self, fms8, batch_size):
+        # --------------------------------------------------- keypoint loss
+        bs, ch, he, wi = fms8.shape
+        fms8 = fms8.view(batch_size, -1, fms8.size(2), fms8.size(3))
+        anchor_fm = fms8[:, 0:ch, :, :]  # anchor has one sample
+        if len(anchor_fm.shape) == 3:
+            anchor_fm.unsqueeze(1)
+        pos_fm = fms8[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
+        neg_fm = fms8[:, self.samples_subject * ch:2 * self.samples_subject * ch, :, :].contiguous()
+        neg2_fm = fms8[:, 2 * self.samples_subject * ch:, :, :].contiguous()
+        # distance anchor negative
+        nneg = int(neg_fm.size(1) / ch)
+        neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))
+        an_loss = self.loss_k(
+            anchor_fm.repeat(1, nneg, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
+            neg_fm)
+        an_loss = an_loss.view((-1, nneg)).min(1)[0]
+        # distance anchor positive
+        npos = int(pos_fm.size(1) / ch)
+        pos_fm = pos_fm.view(-1, ch, pos_fm.size(2), pos_fm.size(3))
+        ap_loss = self.loss_k(
+            anchor_fm.repeat(1, npos, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
+            pos_fm)
+        ap_loss = ap_loss.view((-1, npos)).max(1)[0]
+        # distance negative negative2
+        neg2_fm = neg2_fm.view(-1, ch, neg2_fm.size(2), neg2_fm.size(3))
+        nn_loss = self.loss_k(neg2_fm, neg_fm)
+        nn_loss = nn_loss.view((-1, nneg)).min(1)[0]
+        quadruplet_cor = F.relu(ap_loss - an_loss + self.args.alpha) + \
+                         F.relu(ap_loss - nn_loss + self.args.alpha2)
+        loss_k = torch.sum(quadruplet_cor) / self.args.batch_size
+
+        return loss_k

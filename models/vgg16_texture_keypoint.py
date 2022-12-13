@@ -64,7 +64,7 @@ class FeatureExtraction(torch.nn.Module):
     github: https://github.com/ignacio-rocco/cnngeometric_pytorch
     paper: Convolutional neural network architecture for geometric matching
     """
-    def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=True,
+    def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=False,
                  last_layer=['relu3_3', 'relu5_3'], use_cuda=True):
         super(FeatureExtraction, self).__init__()
         self.normalization = normalization
@@ -88,7 +88,8 @@ class FeatureExtraction(torch.nn.Module):
                     raise RuntimeError("Please make sure 'last_layer' is a correct input")
                 self.two = True
                 index32 = vgg_feature_layers.index(last_layer[0])
-                self.feature32 = nn.Sequential(*list(self.model.features.children())[:index32 + 1])
+                self.feature32 = nn.Sequential(*list(self.model.features.children())[:index32])
+                self.sigmoid = nn.Sigmoid()
                 index8 = vgg_feature_layers.index(last_layer[1])
                 self.feature8 = nn.Sequential(*list(self.model.features.children())[index32 + 1:index8 + 1])
 
@@ -141,7 +142,7 @@ class FeatureExtraction(torch.nn.Module):
 
     def forward(self, image_batch):
         if self.two:
-            features32 = self.feature32(image_batch)
+            features32 = self.sigmoid(self.feature32(image_batch))
             features8 = self.feature8(features32)
             if self.normalization:
                 features32 = featureL2Norm(features32, dim='texture')

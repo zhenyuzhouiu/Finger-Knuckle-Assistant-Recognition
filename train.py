@@ -62,7 +62,7 @@ def build_parser():
         'GNN_layers': ['self', 'cross'] * 1,
         'weight': ''})
     parser.add_argument('--sinkhorn_it', type=int, dest="sinkhorn_it", default=100)
-    parser.add_argument('--matching_type', type=int, dest="matching_type", default='superglue')
+    parser.add_argument('--matching_type', type=str, dest="matching_type", default='superglue')
 
     # fine-tuning
     parser.add_argument('--start_ckpt', type=str, dest='start_ckpt', default="")

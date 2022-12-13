@@ -17,7 +17,7 @@ def featureL2Norm(feature, dim="channel"):
         norm = torch.pow(torch.sum(torch.pow(feature, 2), 1) + epsilon, 0.5).unsqueeze(1).expand_as(feature)
     else:
         norm = torch.pow(torch.sum(torch.pow(feature, 2).view(b, c, -1), -1) + epsilon, 0.5)
-        norm = norm.unsqueeze(2, 3).repeate(1, 1, h, w)
+        norm = norm.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, h, w)
 
     return torch.div(feature, norm)
 
@@ -222,10 +222,10 @@ class FeatureCorrelation(torch.nn.Module):
             # for representing predicted confidence
             if self.normalization:
                 correlation_tensor = featureL2Norm(self.ReLU(correlation_tensor))
-            bs, ch, he, we = correlation_tensor.shape
+            bs, n, m = correlation_tensor.shape
             # transform the correlation_tensor to correlation_matrix
             # correlation_matrix.shape:-> [b, 64, 64]
-            score_matrix = correlation_tensor.view(bs, ch, -1)
+            score_matrix = correlation_tensor
             score_matrix = score_matrix / (c ** 0.5)
             optimal_p = log_optimal_transport(score_matrix, self.bin_score, iters=self.sinkhorn_it)
             optimal_p = torch.exp(optimal_p)[:, :-1, :-1]

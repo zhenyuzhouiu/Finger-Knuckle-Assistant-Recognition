@@ -29,7 +29,8 @@ class Model(object):
         self.samples_subject = args.samples_subject
         self.train_loader, self.dataset_size = self._build_dataset_loader()
         self.inference, self.loss_t, self.loss_k = self._build_model()
-        self.optimizer = torch.optim.Adam(self.inference.parameters(), args.learning_rate)
+        self.optimizer = torch.optim.Adam([{'params': self.inference.parameters(),
+                                            'params': self.loss_k.parameters()}], args.learning_rate)
 
     def _build_dataset_loader(self):
         transform = transforms.Compose([
@@ -90,9 +91,10 @@ class Model(object):
 
     def _build_model(self):
         inference = FeatureExtraction(train_fe=True).cuda()
-        data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
-        data = Variable(data, requires_grad=False)
-        self.writer.add_graph(inference, [data])
+        # data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
+        # data = Variable(data, requires_grad=False)
+        # inference.eval()
+        # self.writer.add_graph(inference, data)
         inference.cuda()
         inference.train()
         logging("Successfully building FeatureExtraction model")
@@ -101,7 +103,8 @@ class Model(object):
         logging("Successfully building SSIM loss")
         loss_t.cuda()
 
-        loss_k = FeatureCorrelation(normalization=True, matching_type=self.matching_type, sinkhorn_it=self.sinkhorn_it)
+        loss_k = FeatureCorrelation(normalization=False, matching_type=self.args.matching_type,
+                                    sinkhorn_it=self.args.sinkhorn_it)
         logging("Successfully building FeatureCorrelation loss")
         loss_k.cuda()
 
@@ -109,7 +112,6 @@ class Model(object):
 
     def quadruplet_train(self):
         epoch_steps = len(self.train_loader)
-        train_loss = 0
         start_epoch = ''.join(x for x in os.path.basename(self.args.start_ckpt) if x.isdigit())
         if start_epoch:
             start_epoch = int(start_epoch) + 1
@@ -123,6 +125,8 @@ class Model(object):
         for e in range(start_epoch, self.args.epochs + start_epoch):
             self.inference.train()
             agg_loss = 0.
+            agg_loss_t = 0.
+            agg_loss_k = 0.
             loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
             for batch_id, (x, _) in loop:
                 # ======================================================== train inference model
@@ -196,19 +200,22 @@ class Model(object):
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 agg_loss += loss.item()
-                train_loss += loss.item()
+                agg_loss_t += loss_t.item()
+                agg_loss_k += loss_k.item()
 
                 loop.set_description(f'Epoch [{e}/{self.args.epochs}]')
                 loop.set_postfix({"total_loss": "{:.6f}".format(agg_loss),
-                                  "texture_loss": "{:.6f}".format(loss_t.item()),
-                                  "keypoint_loss": "{:.6f}".format(loss_k.item())})
+                                  "texture_loss": "{:.6f}".format(agg_loss_t),
+                                  "keypoint_loss": "{:.6f}".format(agg_loss_k)})
 
             self.writer.add_scalar("lr", scalar_value=self.optimizer.state_dict()['param_groups'][0]['lr'],
                                    global_step=(e + 1))
-            self.writer.add_scalar("loss_inference", scalar_value=train_loss,
+            self.writer.add_scalar("loss_inference", scalar_value=agg_loss,
                                    global_step=((e + 1) * epoch_steps))
-
-            train_loss = 0
+            self.writer.add_scalar("loss_inference", scalar_value=agg_loss_t,
+                                   global_step=((e + 1) * epoch_steps))
+            self.writer.add_scalar("loss_inference", scalar_value=agg_loss_k,
+                                   global_step=((e + 1) * epoch_steps))
 
             if self.args.checkpoint_dir is not None and e % self.args.checkpoint_interval == 0:
                 self.save(self.args.checkpoint_dir, e)
@@ -218,12 +225,20 @@ class Model(object):
         self.writer.close()
 
     def save(self, checkpoint_dir, e):
+        # -------------------- inference
         self.inference.eval()
         self.inference.cpu()
         ckpt_model_filename = os.path.join(checkpoint_dir, "ckpt_epoch_" + str(e) + ".pth")
         torch.save(self.inference.state_dict(), ckpt_model_filename)
         self.inference.cuda()
         self.inference.train()
+        # --------------------- keypoint loss
+        self.loss_k.eval()
+        self.loss_k.cpu()
+        ckpt_loss_filename = os.path.join(checkpoint_dir, "ckpt_epoch_lossk_" + str(e) + ".pth")
+        torch.save(self.loss_k.state_dict(), ckpt_loss_filename)
+        self.loss_k.cuda()
+        self.loss_k.train()
 
     def load(self, checkpoint_dir):
         self.inference.load_state_dict(torch.load(checkpoint_dir))

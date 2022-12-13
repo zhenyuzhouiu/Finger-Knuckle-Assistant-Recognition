@@ -5,7 +5,7 @@ from tqdm import tqdm
 import torchvision.utils
 from torch.autograd import Variable
 
-from models.vgg16 import FeatureExtraction, FeatureCorrelation
+from models.vgg16_texture_keypoint import FeatureExtraction, FeatureCorrelation
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM
 from torchvision import transforms
 import torchvision
@@ -101,7 +101,7 @@ class Model(object):
         logging("Successfully building SSIM loss")
         loss_t.cuda()
 
-        loss_k = FeatureCorrelation()
+        loss_k = FeatureCorrelation(normalization=True, matching_type=self.matching_type, sinkhorn_it=self.sinkhorn_it)
         logging("Successfully building FeatureCorrelation loss")
         loss_k.cuda()
 

@@ -5,22 +5,65 @@ from torch.autograd import Variable
 from loss.sinkhorn import *
 
 
-def featureL2Norm(feature):
+def featureL2Norm(feature, dim="channel"):
     """
     github: https://github.com/ignacio-rocco/cnngeometric_pytorch
     paper: Convolutional neural network architecture for geometric matching
     """
+    # feature.shape:-> [b, c, h, w]
+    b, c, h, w = feature.shape
     epsilon = 1e-6
-    norm = torch.pow(torch.sum(torch.pow(feature, 2), 1) + epsilon, 0.5).unsqueeze(1).expand_as(feature)
+    if dim == "channel":
+        norm = torch.pow(torch.sum(torch.pow(feature, 2), 1) + epsilon, 0.5).unsqueeze(1).expand_as(feature)
+    else:
+        norm = torch.pow(torch.sum(torch.pow(feature, 2).view(b, c, -1), -1) + epsilon, 0.5)
+        norm = norm.unsqueeze(2, 3).repeate(1, 1, h, w)
+
     return torch.div(feature, norm)
 
+
+def log_sinkhorn_iterations(Z: torch.Tensor, log_mu: torch.Tensor, log_nu: torch.Tensor, iters: int) -> torch.Tensor:
+    """
+    Perform Sinkhorn Normalization in Log-space for stability
+    https://github.com/magicleap/SuperGluePretrainedNetwork
+    """
+    u, v = torch.zeros_like(log_mu), torch.zeros_like(log_nu)
+    for _ in range(iters):
+        u = log_mu - torch.logsumexp(Z + v.unsqueeze(1), dim=2)
+        v = log_nu - torch.logsumexp(Z + u.unsqueeze(2), dim=1)
+    return Z + u.unsqueeze(2) + v.unsqueeze(1)
+
+
+def log_optimal_transport(scores: torch.Tensor, alpha: torch.Tensor, iters: int) -> torch.Tensor:
+    """
+    Perform Differentiable Optimal Transport in Log-space for stability
+    https://github.com/magicleap/SuperGluePretrainedNetwork
+    """
+    b, m, n = scores.shape
+    one = scores.new_tensor(1)
+    ms, ns = (m * one).to(scores), (n * one).to(scores)
+
+    bins0 = alpha.expand(b, m, 1)
+    bins1 = alpha.expand(b, 1, n)
+    alpha = alpha.expand(b, 1, 1)
+
+    couplings = torch.cat([torch.cat([scores, bins0], -1),
+                           torch.cat([bins1, alpha], -1)], 1)
+
+    norm = - (ms + ns).log()
+    log_mu = torch.cat([norm.expand(m), ns.log()[None] + norm])
+    log_nu = torch.cat([norm.expand(n), ms.log()[None] + norm])
+    log_mu, log_nu = log_mu[None].expand(b, -1), log_nu[None].expand(b, -1)
+
+    Z = log_sinkhorn_iterations(couplings, log_mu, log_nu, iters)
+    Z = Z - norm  # multiply probabilities by M+N
+    return Z
 
 class FeatureExtraction(torch.nn.Module):
     """
     github: https://github.com/ignacio-rocco/cnngeometric_pytorch
     paper: Convolutional neural network architecture for geometric matching
     """
-
     def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=True,
                  last_layer=['relu3_3', 'relu5_3'], use_cuda=True):
         super(FeatureExtraction, self).__init__()
@@ -101,8 +144,8 @@ class FeatureExtraction(torch.nn.Module):
             features32 = self.feature32(image_batch)
             features8 = self.feature8(features32)
             if self.normalization:
-                features32 = featureL2Norm(features32)
-                features8 = featureL2Norm(features8)
+                features32 = featureL2Norm(features32, dim='texture')
+                features8 = featureL2Norm(features8, dim='channel')
             return features32, features8
         else:
             features = self.model(image_batch)
@@ -117,15 +160,19 @@ class FeatureCorrelation(torch.nn.Module):
     paper: Convolutional neural network architecture for geometric matching
     """
 
-    def __init__(self, shape='3D', normalization=True, matching_type='correlation'):
+    def __init__(self, shape='3D', normalization=True, matching_type='superglue', sinkhorn_it=100):
         super(FeatureCorrelation, self).__init__()
         self.normalization = normalization
         self.matching_type = matching_type
         self.shape = shape
         self.ReLU = nn.ReLU()
+        bin_score = torch.nn.Parameter(torch.tensor(1.))
+        self.register_parameter('bin_score', bin_score)
+        self.sinkhorn_it = sinkhorn_it
 
     def forward(self, feature_A, feature_B):
         b, c, h, w = feature_A.size()
+
         if self.matching_type == 'correlation':
             if self.shape == '3D':
                 # reshape features for matrix multiplication
@@ -144,18 +191,48 @@ class FeatureCorrelation(torch.nn.Module):
                 # indexed [batch,row_A,col_A,row_B,col_B]
                 correlation_tensor = feature_mul.view(b, h, w, h, w).unsqueeze(1)
 
+            # from the "Convolutional neural network architecture for geometric matching"
+            # correlation_tensor should be normalized for non-maximal suppressing
+            # however, from the superglue, the correlation_tensor should not be normalized
+            # for representing predicted confidence
             if self.normalization:
                 correlation_tensor = featureL2Norm(self.ReLU(correlation_tensor))
             bs, ch, he, we = correlation_tensor.shape
             # transform the correlation_tensor to correlation_matrix
             # correlation_matrix.shape:-> [b, 64, 64]
-            correlation_matrix = correlation_tensor.view(bs, ch, -1)
+            score_matrix = correlation_tensor.view(bs, ch, -1)
+            score_matrix = score_matrix / (c ** 0.5)
+            optimal_p = log_optimal_transport(score_matrix, self.bin_score,
+                                              iters=self.sinkhorn_it)
+            optimal_p = torch.exp(optimal_p)[:, :-1, :-1]
+            # ot will be larger with two images are more similar
+            ot = torch.sum(optimal_p.mul(score_matrix).view(b, -1), -1)
 
+            return torch.exp(-ot)
 
+        if self.matching_type == 'superglue':
+            # feature_A.shape==feature_B.shape:-> [b, c, 8, 8]
+            keypoint_A = feature_A.view(b, c, -1)  # shape:-> [b, c, 64]
+            keypoint_B = feature_B.view(b, c, -1)
+            correlation_tensor = torch.einsum('bdn,bdm->bnm', keypoint_A, keypoint_B)
 
+            # from the "Convolutional neural network architecture for geometric matching"
+            # correlation_tensor should be normalized for non-maximal suppressing
+            # however, from the superglue, the correlation_tensor should not be normalized
+            # for representing predicted confidence
+            if self.normalization:
+                correlation_tensor = featureL2Norm(self.ReLU(correlation_tensor))
+            bs, ch, he, we = correlation_tensor.shape
+            # transform the correlation_tensor to correlation_matrix
+            # correlation_matrix.shape:-> [b, 64, 64]
+            score_matrix = correlation_tensor.view(bs, ch, -1)
+            score_matrix = score_matrix / (c ** 0.5)
+            optimal_p = log_optimal_transport(score_matrix, self.bin_score, iters=self.sinkhorn_it)
+            optimal_p = torch.exp(optimal_p)[:, :-1, :-1]
+            # ot will be larger with two images are more similar
+            ot = torch.sum(optimal_p.mul(score_matrix).view(b, -1), -1)
 
-
-            return 0
+            return torch.exp(-ot)
 
         if self.matching_type == 'subtraction':
             return feature_A.sub(feature_B)

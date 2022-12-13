@@ -26,7 +26,7 @@ from protocol_util import *
 from torchvision import transforms
 from inspect import getsourcefile
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM
-from models.vgg16 import *
+from models.vgg16_texture_keypoint import *
 import os.path as path
 from os.path import join
 

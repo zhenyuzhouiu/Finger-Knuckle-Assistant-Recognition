@@ -29,8 +29,8 @@ class Model(object):
         self.samples_subject = args.samples_subject
         self.train_loader, self.dataset_size = self._build_dataset_loader()
         self.inference, self.loss_t, self.loss_k = self._build_model()
-        self.optimizer = torch.optim.Adam([{'params': self.inference.parameters(),
-                                            'params': self.loss_k.parameters()}], args.learning_rate)
+        self.optimizer1 = torch.optim.Adam(self.inference.parameters(), args.learning_rate1)
+        self.optimizer2 = torch.optim.Adam(self.loss_k.parameters(), args.learning_rate2)
 
     def _build_dataset_loader(self):
         transform = transforms.Compose([
@@ -67,6 +67,7 @@ class Model(object):
                                     sinkhorn_it=self.args.sinkhorn_it)
         logging("Successfully building FeatureCorrelation loss")
         loss_k.cuda()
+        loss_k.train()
 
         return inference, loss_t, loss_k
 
@@ -80,7 +81,8 @@ class Model(object):
             start_epoch = 1
 
         # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
-        scheduler = MultiStepLR(self.optimizer, milestones=[10, 500, 1000], gamma=0.1)
+        scheduler1 = MultiStepLR(self.optimizer1, milestones=[10, 500, 1000], gamma=0.1)
+        scheduler2 = MultiStepLR(self.optimizer2, milestones=[5, 500, 1000], gamma=0.1)
 
         for e in range(start_epoch, self.args.epochs + start_epoch):
             self.inference.train()
@@ -100,8 +102,10 @@ class Model(object):
 
                 loss = loss_t + loss_k
                 loss.backward()
-                self.optimizer.step()
-                self.optimizer.zero_grad()
+                self.optimizer1.step()
+                self.optimizer1.zero_grad()
+                self.optimizer2.step()
+                self.optimizer2.zero_grad()
                 agg_loss += loss.item()
                 agg_loss_t += loss_t.item()
                 agg_loss_k += loss_k.item()
@@ -123,7 +127,8 @@ class Model(object):
             if self.args.checkpoint_dir is not None and e % self.args.checkpoint_interval == 0:
                 self.save(self.args.checkpoint_dir, e)
 
-            scheduler.step()
+            scheduler1.step()
+            scheduler2.step()
 
         self.writer.close()
 

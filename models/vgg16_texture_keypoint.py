@@ -91,7 +91,7 @@ class FeatureExtraction(torch.nn.Module):
                 self.feature32 = nn.Sequential(*list(self.model.features.children())[:index32])
                 self.sigmoid = nn.Sigmoid()
                 index8 = vgg_feature_layers.index(last_layer[1])
-                self.feature8 = nn.Sequential(*list(self.model.features.children())[index32 + 1:index8 + 1])
+                self.feature8 = nn.Sequential(*list(self.model.features.children())[index32:index8 + 1])
 
         if feature_extraction_cnn == 'resnet101':
             self.model = models.resnet101(pretrained=True)

@@ -44,7 +44,8 @@ def build_parser():
     # Training StrategyResidualSTNet
     parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
-    parser.add_argument('--learning_rate', type=float, dest='learning_rate', default=1e-3)
+    parser.add_argument('--learning_rate1', type=float, dest='learning_rate1', default=1e-3)
+    parser.add_argument('--learning_rate2', type=float, dest='learning_rate2', default=1e-4)
 
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
@@ -61,7 +62,7 @@ def build_parser():
     parser.add_argument('--sglue_conf', type=dict, dest="sglue_conf", default={
         'GNN_layers': ['self', 'cross'] * 1,
         'weight': ''})
-    parser.add_argument('--sinkhorn_it', type=int, dest="sinkhorn_it", default=100)
+    parser.add_argument('--sinkhorn_it', type=int, dest="sinkhorn_it", default=30)
     parser.add_argument('--matching_type', type=str, dest="matching_type", default='superglue')
 
     # fine-tuning
@@ -76,12 +77,11 @@ def main():
     this_datetime = datetime.datetime.now().strftime('%m-%d-%H-%M-%S')
     args.checkpoint_dir = os.path.join(
         args.checkpoint_dir,
-        "{}_{}_{}_{}-lr{}-r{}-a{}-2a{}-hs{}_vs{}_{}".format(
+        "{}_{}_{}_{}-r{}-a{}-2a{}-hs{}_vs{}_{}".format(
             args.db_prefix,
             args.model,
             args.n_tuple,
             args.loss_type,
-            float(args.learning_rate),
             int(args.rotate_angle),
             float(args.alpha),
             float(args.alpha2),

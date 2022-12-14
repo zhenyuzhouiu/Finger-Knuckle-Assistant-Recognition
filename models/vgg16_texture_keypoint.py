@@ -59,11 +59,13 @@ def log_optimal_transport(scores: torch.Tensor, alpha: torch.Tensor, iters: int)
     Z = Z - norm  # multiply probabilities by M+N
     return Z
 
+
 class FeatureExtraction(torch.nn.Module):
     """
     github: https://github.com/ignacio-rocco/cnngeometric_pytorch
     paper: Convolutional neural network architecture for geometric matching
     """
+
     def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=False,
                  last_layer=['relu3_3', 'relu5_3'], use_cuda=True):
         super(FeatureExtraction, self).__init__()
@@ -174,6 +176,19 @@ class FeatureCorrelation(torch.nn.Module):
     def forward(self, feature_A, feature_B):
         b, c, h, w = feature_A.size()
 
+        if self.matching_type == 'superglue':
+            # feature_A.shape==feature_B.shape:-> [b, c, 8, 8]
+            keypoint_A = feature_A.view(b, c, -1).permute(0, 2, 1)  # shape:-> [b, c, 64]
+            keypoint_B = feature_B.view(b, c, -1)
+            correlation = torch.mm(keypoint_A, keypoint_B)
+            score_matrix = correlation / (c ** 0.5)
+            optimal_p = log_optimal_transport(score_matrix, self.bin_score, iters=self.sinkhorn_it)
+            optimal_p = torch.exp(optimal_p)[:, :-1, :-1]
+            # ot will be larger with two images are more similar
+            ot = torch.sum(optimal_p.mul(score_matrix).view(b, -1), -1)
+
+            return torch.exp(-ot)
+
         if self.matching_type == 'correlation':
             if self.shape == '3D':
                 # reshape features for matrix multiplication
@@ -205,30 +220,6 @@ class FeatureCorrelation(torch.nn.Module):
             score_matrix = score_matrix / (c ** 0.5)
             optimal_p = log_optimal_transport(score_matrix, self.bin_score,
                                               iters=self.sinkhorn_it)
-            optimal_p = torch.exp(optimal_p)[:, :-1, :-1]
-            # ot will be larger with two images are more similar
-            ot = torch.sum(optimal_p.mul(score_matrix).view(b, -1), -1)
-
-            return torch.exp(-ot)
-
-        if self.matching_type == 'superglue':
-            # feature_A.shape==feature_B.shape:-> [b, c, 8, 8]
-            keypoint_A = feature_A.view(b, c, -1)  # shape:-> [b, c, 64]
-            keypoint_B = feature_B.view(b, c, -1)
-            correlation_tensor = torch.einsum('bdn,bdm->bnm', keypoint_A, keypoint_B)
-
-            # from the "Convolutional neural network architecture for geometric matching"
-            # correlation_tensor should be normalized for non-maximal suppressing
-            # however, from the superglue, the correlation_tensor should not be normalized
-            # for representing predicted confidence
-            if self.normalization:
-                correlation_tensor = featureL2Norm(self.ReLU(correlation_tensor))
-            bs, n, m = correlation_tensor.shape
-            # transform the correlation_tensor to correlation_matrix
-            # correlation_matrix.shape:-> [b, 64, 64]
-            score_matrix = correlation_tensor
-            score_matrix = score_matrix / (c ** 0.5)
-            optimal_p = log_optimal_transport(score_matrix, self.bin_score, iters=self.sinkhorn_it)
             optimal_p = torch.exp(optimal_p)[:, :-1, :-1]
             # ot will be larger with two images are more similar
             ot = torch.sum(optimal_p.mul(score_matrix).view(b, -1), -1)

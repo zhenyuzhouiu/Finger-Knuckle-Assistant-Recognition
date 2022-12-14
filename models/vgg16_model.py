@@ -51,10 +51,6 @@ class Model(object):
 
     def _build_model(self):
         inference = FeatureExtraction(train_fe=True).cuda()
-        # data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
-        # data = Variable(data, requires_grad=False)
-        # inference.eval()
-        # self.writer.add_graph(inference, data)
         inference.cuda()
         inference.train()
         logging("Successfully building FeatureExtraction model")
@@ -91,6 +87,8 @@ class Model(object):
             agg_loss_k = 0.
             loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
             for batch_id, (x, _) in loop:
+                self.optimizer1.zero_grad()
+                self.optimizer2.zero_grad()
                 # ======================================================== train inference model
                 x = x.cuda()
                 x = Variable(x, requires_grad=False)
@@ -103,9 +101,7 @@ class Model(object):
                 loss = loss_t + loss_k
                 loss.backward()
                 self.optimizer1.step()
-                self.optimizer1.zero_grad()
                 self.optimizer2.step()
-                self.optimizer2.zero_grad()
                 agg_loss += loss.item()
                 agg_loss_t += loss_t.item()
                 agg_loss_k += loss_k.item()
@@ -115,7 +111,9 @@ class Model(object):
                                   "texture_loss": "{:.6f}".format(agg_loss_t),
                                   "keypoint_loss": "{:.6f}".format(agg_loss_k)})
 
-            self.writer.add_scalar("lr", scalar_value=self.optimizer.state_dict()['param_groups'][0]['lr'],
+            self.writer.add_scalar("lr1", scalar_value=self.optimizer1.state_dict()['param_groups'][0]['lr'],
+                                   global_step=(e + 1))
+            self.writer.add_scalar("lr2", scalar_value=self.optimizer2.state_dict()['param_groups'][0]['lr'],
                                    global_step=(e + 1))
             self.writer.add_scalar("loss_inference", scalar_value=agg_loss,
                                    global_step=((e + 1) * epoch_steps))
@@ -155,13 +153,13 @@ class Model(object):
     def texture_loss(self, fms32, batch_size):
         # -------------------------------------------------- texture loss
         bs, ch, he, wi = fms32.shape
-        fms32 = fms32.view(batch_size, -1, fms32.size(2), fms32.size(3))
-        anchor_fm = fms32[:, 0:ch, :, :]  # anchor has one sample
+        fms = fms32.view(batch_size, -1, fms32.size(2), fms32.size(3))
+        anchor_fm = fms[:, 0:ch, :, :]  # anchor has one sample
         if len(anchor_fm.shape) == 3:
             anchor_fm.unsqueeze(1)
-        pos_fm = fms32[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
-        neg_fm = fms32[:, self.samples_subject * ch:2 * self.samples_subject * ch, :, :].contiguous()
-        neg2_fm = fms32[:, 2 * self.samples_subject * ch:, :, :].contiguous()
+        pos_fm = fms[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
+        neg_fm = fms[:, self.samples_subject * ch:2 * self.samples_subject * ch, :, :].contiguous()
+        neg2_fm = fms[:, 2 * self.samples_subject * ch:, :, :].contiguous()
         # distance anchor negative
         nneg = int(neg_fm.size(1) / ch)
         neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))
@@ -189,13 +187,13 @@ class Model(object):
     def keypoint_loss(self, fms8, batch_size):
         # --------------------------------------------------- keypoint loss
         bs, ch, he, wi = fms8.shape
-        fms8 = fms8.view(batch_size, -1, fms8.size(2), fms8.size(3))
-        anchor_fm = fms8[:, 0:ch, :, :]  # anchor has one sample
+        fms = fms8.view(batch_size, -1, fms8.size(2), fms8.size(3))
+        anchor_fm = fms[:, 0:ch, :, :]  # anchor has one sample
         if len(anchor_fm.shape) == 3:
             anchor_fm.unsqueeze(1)
-        pos_fm = fms8[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
-        neg_fm = fms8[:, self.samples_subject * ch:2 * self.samples_subject * ch, :, :].contiguous()
-        neg2_fm = fms8[:, 2 * self.samples_subject * ch:, :, :].contiguous()
+        pos_fm = fms[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
+        neg_fm = fms[:, self.samples_subject * ch:2 * self.samples_subject * ch, :, :].contiguous()
+        neg2_fm = fms[:, 2 * self.samples_subject * ch:, :, :].contiguous()
         # distance anchor negative
         nneg = int(neg_fm.size(1) / ch)
         neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))

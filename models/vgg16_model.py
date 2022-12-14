@@ -127,7 +127,6 @@ class Model(object):
 
             scheduler1.step()
             scheduler2.step()
-
         self.writer.close()
 
     def save(self, checkpoint_dir, e):

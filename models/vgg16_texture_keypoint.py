@@ -22,6 +22,13 @@ def featureL2Norm(feature, dim="channel"):
     return torch.div(feature, norm)
 
 
+class reciprocal_sqrt(torch.nn.Module):
+    def __init__(self):
+        super(reciprocal_sqrt, self).__init__()
+
+    def forward(self, x):
+        out = 1 / torch.sqrt(x)
+        return out
 def log_sinkhorn_iterations(Z: torch.Tensor, log_mu: torch.Tensor, log_nu: torch.Tensor, iters: int) -> torch.Tensor:
     """
     Perform Sinkhorn Normalization in Log-space for stability
@@ -66,7 +73,7 @@ class FeatureExtraction(torch.nn.Module):
     paper: Convolutional neural network architecture for geometric matching
     """
 
-    def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=False,
+    def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=True,
                  last_layer=['relu3_3', 'relu5_3'], use_cuda=True):
         super(FeatureExtraction, self).__init__()
         self.normalization = normalization
@@ -90,10 +97,9 @@ class FeatureExtraction(torch.nn.Module):
                     raise RuntimeError("Please make sure 'last_layer' is a correct input")
                 self.two = True
                 index32 = vgg_feature_layers.index(last_layer[0])
-                self.feature32 = nn.Sequential(*list(self.model.features.children())[:index32])
-                self.sigmoid = nn.Sigmoid()
+                self.feature32 = nn.Sequential(*list(self.model.features.children())[:index32+1])
                 index8 = vgg_feature_layers.index(last_layer[1])
-                self.feature8 = nn.Sequential(*list(self.model.features.children())[index32:index8 + 1])
+                self.feature8 = nn.Sequential(*list(self.model.features.children())[index32+1:index8 + 1])
 
         if feature_extraction_cnn == 'resnet101':
             self.model = models.resnet101(pretrained=True)
@@ -144,7 +150,7 @@ class FeatureExtraction(torch.nn.Module):
 
     def forward(self, image_batch):
         if self.two:
-            features32 = self.sigmoid(self.feature32(image_batch))
+            features32 = self.feature32(image_batch)
             features8 = self.feature8(features32)
             if self.normalization:
                 features32 = featureL2Norm(features32, dim='texture')
@@ -172,6 +178,7 @@ class FeatureCorrelation(torch.nn.Module):
         bin_score = torch.nn.Parameter(torch.tensor(1.))
         self.register_parameter('bin_score', bin_score)
         self.sinkhorn_it = sinkhorn_it
+        self.re_sqrt = reciprocal_sqrt()
 
     def forward(self, feature_A, feature_B):
         b, c, h, w = feature_A.size()
@@ -180,14 +187,14 @@ class FeatureCorrelation(torch.nn.Module):
             # feature_A.shape==feature_B.shape:-> [b, c, 8, 8]
             keypoint_A = feature_A.view(b, c, -1).permute(0, 2, 1)  # shape:-> [b, c, 64]
             keypoint_B = feature_B.view(b, c, -1)
-            correlation = torch.mm(keypoint_A, keypoint_B)
+            correlation = torch.matmul(keypoint_A, keypoint_B)
             score_matrix = correlation / (c ** 0.5)
             optimal_p = log_optimal_transport(score_matrix, self.bin_score, iters=self.sinkhorn_it)
             optimal_p = torch.exp(optimal_p)[:, :-1, :-1]
             # ot will be larger with two images are more similar
             ot = torch.sum(optimal_p.mul(score_matrix).view(b, -1), -1)
 
-            return torch.exp(-ot)
+            return self.re_sqrt(ot)
 
         if self.matching_type == 'correlation':
             if self.shape == '3D':

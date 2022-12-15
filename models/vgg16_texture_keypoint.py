@@ -3,6 +3,7 @@ import torch.nn as nn
 import torchvision.models as models
 from torch.autograd import Variable
 from loss.sinkhorn import *
+import torch.nn.functional as F
 
 
 def featureL2Norm(feature, dim="channel"):
@@ -73,8 +74,8 @@ class FeatureExtraction(torch.nn.Module):
     paper: Convolutional neural network architecture for geometric matching
     """
 
-    def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=True,
-                 last_layer=['relu3_3', 'relu5_3'], use_cuda=True):
+    def __init__(self, train_fe=False, feature_extraction_cnn='vgg', normalization=False,
+                 last_layer=['relu3_3', 'pool5'], use_cuda=True):
         super(FeatureExtraction, self).__init__()
         self.normalization = normalization
         if feature_extraction_cnn == 'vgg':
@@ -150,7 +151,7 @@ class FeatureExtraction(torch.nn.Module):
 
     def forward(self, image_batch):
         if self.two:
-            features32 = self.feature32(image_batch)
+            features32 = torch.sigmoid(self.feature32(image_batch))
             features8 = self.feature8(features32)
             if self.normalization:
                 features32 = featureL2Norm(features32, dim='texture')
@@ -162,6 +163,15 @@ class FeatureExtraction(torch.nn.Module):
                 features = featureL2Norm(features)
             return features
 
+
+class VGG16(torch.nn.Module):
+    def __init__(self):
+        super(VGG16, self).__init__()
+        self.conv1_1 = nn.Conv2d()
+        self.conv1_2 = nn.Conv2d()
+
+    def forward(self):
+        return 0
 
 class FeatureCorrelation(torch.nn.Module):
     """
@@ -188,12 +198,14 @@ class FeatureCorrelation(torch.nn.Module):
             keypoint_A = feature_A.view(b, c, -1).permute(0, 2, 1)  # shape:-> [b, c, 64]
             keypoint_B = feature_B.view(b, c, -1)
             correlation = torch.matmul(keypoint_A, keypoint_B)
-            score_matrix = correlation / (c ** 0.5)
+            # score_matrix = correlation / (c ** 0.5)
+            score_matrix = correlation
             optimal_p = log_optimal_transport(score_matrix, self.bin_score, iters=self.sinkhorn_it)
-            optimal_p = torch.exp(optimal_p)[:, :-1, :-1]
+            optimal = torch.exp(optimal_p)[:, :-1, :-1]
             # ot will be larger with two images are more similar
-            ot = torch.sum(optimal_p.mul(score_matrix).view(b, -1), -1)
+            ot = torch.sum(optimal.mul(score_matrix).view(b, -1), -1)
 
+            # self.re_sqrt(ot) torch.exp(-ot)
             return self.re_sqrt(ot)
 
         if self.matching_type == 'correlation':

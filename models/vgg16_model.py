@@ -95,15 +95,17 @@ class Model(object):
                 fms32, fms8 = self.inference(x.view(-1, 3, x.size(2), x.size(3)))
                 # (batch_size, anchor+positive+negative, 32, 32)
                 b, c, h, w = x.shape
-                loss_t = self.texture_loss(fms32, batch_size=b)
+                # loss_t = self.texture_loss(fms32, batch_size=b)
                 loss_k = self.keypoint_loss(fms8, batch_size=b)
 
-                loss = loss_t + loss_k
+                # loss = loss_t + loss_k
+                loss = loss_k
                 loss.backward()
                 self.optimizer1.step()
                 self.optimizer2.step()
                 agg_loss += loss.item()
-                agg_loss_t += loss_t.item()
+                # agg_loss_t += loss_t.item()
+                agg_loss_t += 0
                 agg_loss_k += loss_k.item()
 
                 loop.set_description(f'Epoch [{e}/{self.args.epochs}]')
@@ -177,8 +179,7 @@ class Model(object):
         neg2_fm = neg2_fm.view(-1, ch, neg2_fm.size(2), neg2_fm.size(3))
         nn_loss = self.loss_t(neg2_fm, neg_fm)
         nn_loss = nn_loss.view((-1, nneg)).min(1)[0]
-        quadruplet_ssim = F.relu(ap_loss - an_loss + self.args.alpha) + \
-                          F.relu(ap_loss - nn_loss + self.args.alpha2)
+        quadruplet_ssim = F.relu(ap_loss - an_loss + self.args.alpha) + F.relu(ap_loss - nn_loss + self.args.alpha2)
         loss_t = torch.sum(quadruplet_ssim) / self.args.batch_size
 
         return loss_t
@@ -211,8 +212,7 @@ class Model(object):
         neg2_fm = neg2_fm.view(-1, ch, neg2_fm.size(2), neg2_fm.size(3))
         nn_loss = self.loss_k(neg2_fm, neg_fm)
         nn_loss = nn_loss.view((-1, nneg)).min(1)[0]
-        quadruplet_cor = F.relu(ap_loss - an_loss + self.args.alpha) + \
-                         F.relu(ap_loss - nn_loss + self.args.alpha2)
+        quadruplet_cor = F.relu(ap_loss - an_loss + self.args.alpha) + F.relu(ap_loss - nn_loss + self.args.alpha2)
         loss_k = torch.sum(quadruplet_cor) / self.args.batch_size
 
         return loss_k

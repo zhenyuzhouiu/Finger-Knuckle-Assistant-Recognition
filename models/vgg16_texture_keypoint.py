@@ -30,6 +30,8 @@ class reciprocal_sqrt(torch.nn.Module):
     def forward(self, x):
         out = 1 / torch.sqrt(x)
         return out
+
+
 def log_sinkhorn_iterations(Z: torch.Tensor, log_mu: torch.Tensor, log_nu: torch.Tensor, iters: int) -> torch.Tensor:
     """
     Perform Sinkhorn Normalization in Log-space for stability
@@ -98,9 +100,9 @@ class FeatureExtraction(torch.nn.Module):
                     raise RuntimeError("Please make sure 'last_layer' is a correct input")
                 self.two = True
                 index32 = vgg_feature_layers.index(last_layer[0])
-                self.feature32 = nn.Sequential(*list(self.model.features.children())[:index32+1])
+                self.feature32 = nn.Sequential(*list(self.model.features.children())[:index32 + 1])
                 index8 = vgg_feature_layers.index(last_layer[1])
-                self.feature8 = nn.Sequential(*list(self.model.features.children())[index32+1:index8 + 1])
+                self.feature8 = nn.Sequential(*list(self.model.features.children())[index32 + 1:index8 + 1])
 
         if feature_extraction_cnn == 'resnet101':
             self.model = models.resnet101(pretrained=True)
@@ -167,11 +169,60 @@ class FeatureExtraction(torch.nn.Module):
 class VGG16(torch.nn.Module):
     def __init__(self):
         super(VGG16, self).__init__()
-        self.conv1_1 = nn.Conv2d()
-        self.conv1_2 = nn.Conv2d()
+        self.conv1_1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
+        self.bn1_1 = nn.BatchNorm2d(64)
+        self.conv1_2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
+        self.bn1_2 = nn.BatchNorm2d(64)
+        self.conv2_1 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
+        self.bn2_1 = nn.BatchNorm2d(128)
+        self.conv2_2 = nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1)
+        self.bn2_2 = nn.BatchNorm2d(128)
+        self.conv3_1 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
+        self.bn3_1 = nn.BatchNorm2d(256)
+        self.conv3_2 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
+        self.bn3_2 = nn.BatchNorm2d(256)
+        self.conv3_3 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
+        self.bn3_3 = nn.BatchNorm2d(256)
+        self.conv4_1 = nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1)
+        self.bn4_1 = nn.BatchNorm2d(512)
+        self.conv4_2 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)
+        self.bn4_2 = nn.BatchNorm2d(512)
+        self.conv4_3 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)
+        self.bn4_3 = nn.BatchNorm2d(512)
+        self.conv5_1 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)
+        self.bn5_1 = nn.BatchNorm2d(512)
+        self.conv5_2 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)
+        self.bn5_2 = nn.BatchNorm2d(512)
+        self.conv5_3 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)
+        self.bn5_3 = nn.BatchNorm2d(512)
 
-    def forward(self):
-        return 0
+        self.relu = nn.ReLU(inplace=True)
+        self.sigmoid = nn.Sigmoid()
+        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+
+    def forward(self, x):
+        conv1_1 = self.relu(self.bn1_1(self.conv1_1(x)))
+        conv1_2 = self.relu(self.bn1_2(self.conv1_2(conv1_1)))
+        stride2 = self.maxpool(conv1_2)
+        conv2_1 = self.relu(self.bn2_1(self.conv2_1(stride2)))
+        conv2_2 = self.relu(self.bn2_2(self.conv2_2(conv2_1)))
+        stride4 = self.maxpool(conv2_2)
+        conv3_1 = self.relu(self.bn3_1(self.conv3_1(stride4)))
+        conv3_2 = self.relu(self.bn3_2(self.conv3_2(conv3_1)))
+        middle = self.bn3_3(self.conv3_3(conv3_2))
+        feature32 = self.sigmoid(middle)
+        conv3_3 = self.relu(middle)
+        stride8 = self.maxpool(conv3_3)
+        conv4_1 = self.relu(self.bn4_1(self.conv4_1(stride8)))
+        conv4_2 = self.relu(self.bn4_2(self.conv4_2(conv4_1)))
+        conv4_3 = self.relu(self.bn4_3(self.conv4_3(conv4_2)))
+        stride16 = self.maxpool(conv4_3)
+        conv5_1 = self.relu(self.bn5_1(self.conv5_1(stride16)))
+        conv5_2 = self.relu(self.bn5_2(self.conv5_2(conv5_1)))
+        feature8 = self.sigmoid(self.bn5_3(self.conv5_3(conv5_2)))
+
+        return feature32, feature8
+
 
 class FeatureCorrelation(torch.nn.Module):
     """

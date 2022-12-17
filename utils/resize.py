@@ -36,8 +36,8 @@ def load_image(path, size=(128, 128)):
     return resize_image
 
 
-src_path = r"F:\mask-seg\mask-seg"
-dst_path = r"F:\mask-seg\mask-seg-128"
+src_path = "/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/"
+dst_path = "/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg-128/"
 if os.path.exists(dst_path):
     shutil.rmtree(dst_path)
 os.mkdir(dst_path)

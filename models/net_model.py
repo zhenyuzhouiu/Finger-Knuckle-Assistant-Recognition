@@ -42,8 +42,7 @@ class ResidualFeatureNet(torch.nn.Module):
         self.conv5 = ConvLayer(64, 1, kernel_size=1, stride=1)
         self.conv6 = ConvLayer
 
-    def forward(self, x, mask):
-        mask = mask
+    def forward(self, x):
         conv1 = F.relu(self.conv1(x))
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))
@@ -53,10 +52,10 @@ class ResidualFeatureNet(torch.nn.Module):
         resid4 = self.resid1(resid3)
         conv4 = F.relu(self.conv4(resid4))
         # the origin version is F.relu
-        conv5 = F.sigmoid(self.conv5(conv4))
-        # conv5 = F.relu(self.conv5(conv4))
+        # conv5 = F.sigmoid(self.conv5(conv4))
+        conv5 = F.relu(self.conv5(conv4))
 
-        return conv5, mask
+        return conv5
 
 
 class ResidualSTNet(torch.nn.Module):
@@ -77,7 +76,7 @@ class ResidualSTNet(torch.nn.Module):
         self.conv4 = ConvLayer(128, 64, kernel_size=3, stride=1)
         self.conv5 = ConvLayer(64, 1, kernel_size=1, stride=1)
 
-    def forward(self, x, mask):
+    def forward(self, x):
         conv1 = F.relu(self.conv1(x))
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))

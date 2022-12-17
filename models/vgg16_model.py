@@ -77,8 +77,8 @@ class Model(object):
             start_epoch = 1
 
         # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
-        scheduler1 = MultiStepLR(self.optimizer1, milestones=[10, 500, 1000], gamma=0.1)
-        scheduler2 = MultiStepLR(self.optimizer2, milestones=[5, 500, 1000], gamma=0.1)
+        scheduler1 = MultiStepLR(self.optimizer1, milestones=[10], gamma=0.1)
+        scheduler2 = MultiStepLR(self.optimizer2, milestones=[5], gamma=0.1)
 
         for e in range(start_epoch, self.args.epochs + start_epoch):
             self.inference.train()
@@ -95,17 +95,15 @@ class Model(object):
                 fms32, fms8 = self.inference(x.view(-1, 3, x.size(2), x.size(3)))
                 # (batch_size, anchor+positive+negative, 32, 32)
                 b, c, h, w = x.shape
-                # loss_t = self.texture_loss(fms32, batch_size=b)
+                loss_t = self.texture_loss(fms32, batch_size=b)
                 loss_k = self.keypoint_loss(fms8, batch_size=b)
 
-                # loss = loss_t + loss_k
-                loss = loss_k
+                loss = loss_t + loss_k
                 loss.backward()
                 self.optimizer1.step()
                 self.optimizer2.step()
                 agg_loss += loss.item()
-                # agg_loss_t += loss_t.item()
-                agg_loss_t += 0
+                agg_loss_t += loss_t.item()
                 agg_loss_k += loss_k.item()
 
                 loop.set_description(f'Epoch [{e}/{self.args.epochs}]')
@@ -119,9 +117,9 @@ class Model(object):
                                    global_step=(e + 1))
             self.writer.add_scalar("loss_inference", scalar_value=agg_loss,
                                    global_step=((e + 1) * epoch_steps))
-            self.writer.add_scalar("loss_inference", scalar_value=agg_loss_t,
+            self.writer.add_scalar("loss_texture", scalar_value=agg_loss_t,
                                    global_step=((e + 1) * epoch_steps))
-            self.writer.add_scalar("loss_inference", scalar_value=agg_loss_k,
+            self.writer.add_scalar("loss_keypoint", scalar_value=agg_loss_k,
                                    global_step=((e + 1) * epoch_steps))
 
             if self.args.checkpoint_dir is not None and e % self.args.checkpoint_interval == 0:

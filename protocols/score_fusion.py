@@ -105,6 +105,7 @@ def dynamic(cls, fk_score_path, fp_score_path, dynamic_save_path, label, color):
         min = np.min(np.array([g_min, i_min]))
         fk_matrix = (fk_matrix - min) / (max - min)
         fk_g_scores, fk_i_scores = get_score(fk_matrix)
+        np.save(dynamic_save_path + '/fk' + str(c) + '.npy', {"g_scores": np.array(fk_g_scores), "i_scores": np.array(fk_i_scores)})
 
         # ---------------------- read fp score and normalize
         fp_score = pd.read_csv(fp_score_file, header=None)
@@ -144,6 +145,7 @@ def dynamic(cls, fk_score_path, fp_score_path, dynamic_save_path, label, color):
             else:
                 fp_i_valid.append(fp_i_scores[i])
         fp_g_scores, fp_i_scores = np.array(fp_g_valid), np.array(fp_i_valid)
+        np.save(dynamic_save_path + '/fp'+str(c)+'.npy', {"g_scores": np.array(fp_g_scores), "i_scores": np.array(fp_i_scores)})
 
         eer = []
         for w in range(0, 105, 5):
@@ -152,6 +154,8 @@ def dynamic(cls, fk_score_path, fp_score_path, dynamic_save_path, label, color):
             dynamic_g = w1 * fk_g_scores + w2 * fp_g_scores
             dynamic_i = w1 * fk_i_scores + w2 * fp_i_scores
             dynamic_save_file = os.path.join(dynamic_save_subject, str(w1) + '-' + str(w2) + '.pdf')
+            dynamic_save_npy = os.path.join(dynamic_save_subject, str(w1) + '-' + str(w2) + '.npy')
+            np.save(dynamic_save_npy, {"g_scores": np.array(dynamic_g), "i_scores": np.array(dynamic_i)})
             l_eer = draw_roc([[fk_g_scores, fk_i_scores], [fp_g_scores, fp_i_scores], [dynamic_g, dynamic_i]],
                              save_path=dynamic_save_file, label=label, color=color)
             eer.append(l_eer[2])
@@ -339,11 +343,11 @@ if __name__ == "__main__":
              '#000000',
              "#c0c0c0"]
 
-    cls = ["01", "02", "04", "05", "06", "07", "08", "09", "10"]
+    cls = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]
 
     fk_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/fk_score/"
     fp_score_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/valid_fp_score/"
-    dynamic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/fusion_score/dynamic/"
+    dynamic_save_path = "/media/zhenyuzhou/Data/Project/Finger-Knuckle-Contactless/deep-learning/codekevin/fknet/test/assistant-fk/dynamic/"
     if os.path.exists(dynamic_save_path):
         shutil.rmtree(dynamic_save_path)
     os.mkdir(dynamic_save_path)

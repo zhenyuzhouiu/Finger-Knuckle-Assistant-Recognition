@@ -12,9 +12,9 @@ import argparse
 from plotroc_basic import *
 
 
-src_npy = ['/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/output/01-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/output/02-protocol.npy',
-           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/output/04-protocol.npy',
+src_npy = ['/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-16-10-05-22/output/texture.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-16-10-05-22/output/keypoint.npy',
+           '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-16-10-05-22/output/combine.npy',
            '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/output/05-protocol.npy',
            '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/output/06-protocol.npy',
            '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/output/07-protocol.npy',
@@ -23,9 +23,9 @@ src_npy = ['/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-As
            '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/output/10-protocol.npy',
            '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/Joint-Left-Middle_RFNet-wholeimagerotationandtranslation-lr0.001-subs8-angle0-a20-hs0_vs0_2022-11-02-21-24/output/finger-knuckle-2018-133-128-all-to-all/10-protocol.npy',]
 
-label = ['Left-Little',
-         'Left-Ring',
-         'Left-Index',
+label = ['Texture',
+         'Keypoint',
+         'Combine',
          'Left-Thumb',
          'Right-Thumb',
          'Right-Index',
@@ -47,9 +47,9 @@ color = ['#ff0000',
          '#808000',
          '#ff00ff',
          '#ff0000']
-dst = '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/output/all-roc.pdf'
+dst = '/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-16-10-05-22/output/roc.pdf'
 
-for i in range(9):
+for i in range(3):
     data = np.load(src_npy[i], allow_pickle=True)[()]
     g_scores = np.array(data['g_scores'])
     i_scores = np.array(data['i_scores'])

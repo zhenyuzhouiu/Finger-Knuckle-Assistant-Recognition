@@ -249,8 +249,8 @@ class FeatureCorrelation(torch.nn.Module):
             keypoint_A = feature_A.view(b, c, -1).permute(0, 2, 1)  # shape:-> [b, c, 64]
             keypoint_B = feature_B.view(b, c, -1)
             correlation = torch.matmul(keypoint_A, keypoint_B)
-            # score_matrix = correlation / (c ** 0.5)
-            score_matrix = correlation
+            score_matrix = correlation / (c ** 0.5)
+            # score_matrix = correlation
             optimal_p = log_optimal_transport(score_matrix, self.bin_score, iters=self.sinkhorn_it)
             optimal = torch.exp(optimal_p)[:, :-1, :-1]
             # ot will be larger with two images are more similar

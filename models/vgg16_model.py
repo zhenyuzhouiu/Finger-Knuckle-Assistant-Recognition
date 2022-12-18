@@ -133,14 +133,14 @@ class Model(object):
         # -------------------- inference
         self.inference.eval()
         self.inference.cpu()
-        ckpt_model_filename = os.path.join(checkpoint_dir, "ckpt_epoch_" + str(e) + ".pth")
+        ckpt_model_filename = os.path.join(checkpoint_dir, "model_epoch_" + str(e) + ".pth")
         torch.save(self.inference.state_dict(), ckpt_model_filename)
         self.inference.cuda()
         self.inference.train()
         # --------------------- keypoint loss
         self.loss_k.eval()
         self.loss_k.cpu()
-        ckpt_loss_filename = os.path.join(checkpoint_dir, "ckpt_epoch_lossk_" + str(e) + ".pth")
+        ckpt_loss_filename = os.path.join(checkpoint_dir, "lossk_epoch_" + str(e) + ".pth")
         torch.save(self.loss_k.state_dict(), ckpt_loss_filename)
         self.loss_k.cuda()
         self.loss_k.train()

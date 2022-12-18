@@ -229,7 +229,7 @@ class Factory(torch.utils.data.Dataset):
             if self.min_subj > len(fnames):
                 self.min_subj = len(fnames)
 
-    def new_triplet_trainitems(self, index):
+    def _triplet_trainitems(self, index):
         # ======================= get images and corresponding features and label
         # Per index, per subject
         selected_folder = self.subfolder_names[index]
@@ -261,39 +261,6 @@ class Factory(torch.utils.data.Dataset):
 
         return img, junk
 
-    def _triplet_trainitems(self, index):
-        # Per index, per subject
-        # Negative samples 5 times than positive
-
-        selected_folder = self.subfolder_names[index]
-        anchor = randpick_list(self.fdict[selected_folder])
-        positive = randpick_list(self.fdict[selected_folder], [anchor])
-
-        img = []
-        # options = 'L' just convert image to gray image
-        # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L'), -1))
-        # img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L'), -1))
-        img.append(load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size))
-        img.append(load_image(join(self.folder, selected_folder, positive), options='RGB', size=self.input_size))
-
-        for i in range(5):
-            negative_folder = randpick_list(self.subfolder_names, [selected_folder])
-            negative = randpick_list(self.fdict[negative_folder])
-            # img.append(np.expand_dims(load_image(join(self.folder, negative_folder, negative), options='RGB'), -1))
-            img.append(load_image(join(self.folder, negative_folder, negative), options='RGB', size=self.input_size))
-
-        img = np.concatenate(img, axis=-1)
-        junk = np.array([0])
-        if self.transform is not None:
-            # Converts a PIL Image or numpy.ndarray (H x W x C) in the range [0, 255]
-            # to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0]
-            # if the PIL Image belongs to one of the modes (L, LA, P, I, F, RGB, YCbCr, RGBA, CMYK, 1)
-            # or if the numpy.ndarray has dtype = np.uint8
-            # In the other cases, tensors are returned without scaling.
-            img = self.transform(img)
-        # img is the data
-        # junk is the label
-        return img, junk
     def _masktriplet_trainitems(self, index):
         # ======================= get images and corresponding features and label
         # Per index, per subject

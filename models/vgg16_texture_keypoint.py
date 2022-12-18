@@ -32,6 +32,47 @@ class reciprocal_sqrt(torch.nn.Module):
         return out
 
 
+def pxy_vector(vector_A, vector_B):
+    """
+    input:
+        vector_A, vector_B
+
+    output:
+        pxy
+    """
+    epsilon = 1e-6
+    num_A = vector_A - torch.mean(vector_A)
+    num_B = vector_B - torch.mean(vector_B)
+    num = torch.sum(torch.mul(num_A, num_B))
+    den = torch.sqrt(torch.sum(torch.pow(num_A, 2))) * torch.sqrt(torch.sum(torch.pow(num_B, 2))) + epsilon
+    pxy = num / den
+    return pxy
+
+
+def pxy_matrix(matrix_A, matrix_B):
+    """
+    input:
+        matrix_A.shape=matrix_B.shape:-> [b, c, n_patch}
+        n_patch = 8*8 or 4*4
+
+    return:
+        pxy.shape = [b, n_patch, n_patch]
+        pxy.value belong [-1, 1]
+        pxy + 1 = [0, 2]
+    """
+    epsilon = 1e-10
+    num_A = matrix_A - torch.mean(matrix_A, dim=1).unsqueeze(1)
+    num_A = num_A.permute(0, 2, 1)  # [b, n_patch, c]
+    num_B = matrix_B - torch.mean(matrix_B, dim=1).unsqueeze(1)
+    num = torch.matmul(num_A, num_B)
+    den_A = torch.sqrt(torch.sum(torch.pow(num_A, 2), dim=2)).unsqueeze(2)
+    den_B = torch.sqrt(torch.sum(torch.pow(num_B, 2), dim=1)).unsqueeze(1)
+    den = torch.matmul(den_A, den_B) + epsilon
+
+    pxy = (num / den) + 2
+    return pxy
+
+
 def log_sinkhorn_iterations(Z: torch.Tensor, log_mu: torch.Tensor, log_nu: torch.Tensor, iters: int) -> torch.Tensor:
     """
     Perform Sinkhorn Normalization in Log-space for stability
@@ -221,6 +262,11 @@ class VGG16(torch.nn.Module):
         conv5_2 = self.relu(self.bn5_2(self.conv5_2(conv5_1)))
         feature8 = self.sigmoid(self.bn5_3(self.conv5_3(conv5_2)))
 
+        # conv5_3 = self.relu(self.bn5_3(self.conv5_3(conv5_2)))
+        # feature4 = self.sigmoid(self.maxpool(conv5_3))
+
+        # normalize8 = featureL2Norm(feature8, dim="channel")
+
         return feature32, feature8
 
 
@@ -245,16 +291,22 @@ class FeatureCorrelation(torch.nn.Module):
         b, c, h, w = feature_A.size()
 
         if self.matching_type == 'superglue':
+            # ------------------------------------ dot product
             # feature_A.shape==feature_B.shape:-> [b, c, 8, 8]
-            keypoint_A = feature_A.view(b, c, -1).permute(0, 2, 1)  # shape:-> [b, c, 64]
+            # keypoint_A = feature_A.view(b, c, -1).permute(0, 2, 1)  # shape:-> [b, 64, c]
+            # keypoint_B = feature_B.view(b, c, -1)
+            # # dot product will depend on the vector value
+            # correlation = torch.matmul(keypoint_A, keypoint_B)
+            # score_matrix = correlation / (c ** 0.5)
+            # pearson correlation
+            keypoint_A = feature_A.view(b, c, -1)
             keypoint_B = feature_B.view(b, c, -1)
-            correlation = torch.matmul(keypoint_A, keypoint_B)
-            score_matrix = correlation / (c ** 0.5)
-            # score_matrix = correlation
-            optimal_p = log_optimal_transport(score_matrix, self.bin_score, iters=self.sinkhorn_it)
+            pxy = pxy_matrix(keypoint_A, keypoint_B)
+
+            optimal_p = log_optimal_transport(pxy, self.bin_score, iters=self.sinkhorn_it)
             optimal = torch.exp(optimal_p)[:, :-1, :-1]
             # ot will be larger with two images are more similar
-            ot = torch.sum(optimal.mul(score_matrix).view(b, -1), -1)
+            ot = torch.sum(optimal.mul(pxy).view(b, -1), -1)
 
             # self.re_sqrt(ot) torch.exp(-ot)
             return self.re_sqrt(ot)

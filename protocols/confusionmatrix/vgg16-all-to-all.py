@@ -14,7 +14,7 @@ import os
 import mpl_toolkits.axes_grid1.axes_size
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import sys
 from PIL import Image
 import numpy as np
@@ -209,13 +209,13 @@ if __name__ == "__main__":
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/01/",
                         dest="test_path")
     parser.add_argument("--out_path", type=str,
-                        default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-16-10-05-22/output/",
+                        default="../../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-17-17-11-50/output/",
                         dest="out_path")
     parser.add_argument("--model_path", type=str,
-                        default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-16-10-05-22/ckpt_epoch_3000.pth",
+                        default="../../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-17-17-11-50/ckpt_epoch_3000.pth",
                         dest="model_path")
     parser.add_argument("--loss_path", type=str,
-                        default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-16-10-05-22/ckpt_epoch_lossk_3000.pth",
+                        default="../../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-17-17-11-50/ckpt_epoch_lossk_3000.pth",
                         dest="loss_path")
 
     args = parser.parse_args()

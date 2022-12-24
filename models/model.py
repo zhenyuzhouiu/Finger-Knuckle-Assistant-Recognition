@@ -58,7 +58,7 @@ class Model(object):
                                 valid_ext=['.bmp', '.jpg', '.JPG'], train=True, n_tuple=args.n_tuple,
                                 if_augment=args.if_augment)
         logging("Successfully Load {} as training dataset...".format(args.train_path))
-        train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
+        train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
 
         if args.n_tuple in ['triplet']:
             examples = iter(train_loader)

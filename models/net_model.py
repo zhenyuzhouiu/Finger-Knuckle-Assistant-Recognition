@@ -94,16 +94,18 @@ class RFNet64(torch.nn.Module):
         self.resid3 = ResidualBlock(128)
         self.resid4 = ResidualBlock(128)
         self.conv4 = ConvLayer(128, 64, kernel_size=3, stride=1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        conv1 = F.relu(self.conv1(x))
-        conv2 = F.relu(self.conv2(conv1))
-        conv3 = F.relu(self.conv3(conv2))
+        conv1 = self.relu(self.conv1(x))
+        conv2 = self.relu(self.conv2(conv1))
+        conv3 = self.relu(self.conv3(conv2))
         resid1 = self.resid1(conv3)
         resid2 = self.resid1(resid1)
         resid3 = self.resid1(resid2)
         resid4 = self.resid1(resid3)
-        conv4 = F.sigmoid(self.conv4(resid4))
+        conv4 = self.sigmoid(self.conv4(resid4))
 
         # conv4.shape:-> [b, 64, 32, 32]
         return conv4

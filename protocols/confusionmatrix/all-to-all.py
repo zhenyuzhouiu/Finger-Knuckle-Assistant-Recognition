@@ -19,6 +19,8 @@ import numpy as np
 import torch
 import cv2
 import argparse
+from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, STNRFNet64
+from models.EfficientNetV2 import efficientnetv2_s, ConvBNAct, fk_efficientnetv2_s
 from torch.autograd import Variable
 import models.EfficientNetV2
 import models.loss_function, models.net_model
@@ -231,13 +233,13 @@ def genuine_imposter_upright(test_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/02/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/01/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="../../checkpoint/Joint-Finger-RFNet/MaskLM_FKEfficientNet_quadruplet_rsssim-r2-a0.6-2a0.3-hs2_vs2_12-23-12-10-56/output/02-protocol.npy",
+                    default="../../checkpoint/Joint-Finger-RFNet/MaskLM_STNRFNet64_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-10-51-41/output/01-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="../../checkpoint/Joint-Finger-RFNet/MaskLM_FKEfficientNet_quadruplet_rsssim-r2-a0.6-2a0.3-hs2_vs2_12-23-12-10-56/ckpt_epoch_620.pth",
+                    default="../../checkpoint/Joint-Finger-RFNet/MaskLM_STNRFNet64_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-10-51-41/ckpt_epoch_3000.pth",
                     dest="model_path")
 parser.add_argument("--loss_path", type=str,
                     default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/ckpt_epoch_1500.pth",
@@ -248,20 +250,15 @@ parser.add_argument('--block_size', type=int, dest="block_size", default=8)
 parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=2)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-parser.add_argument('--model', type=str, dest='model', default="FKEfficientNet")
+parser.add_argument('--model', type=str, dest='model', default="STNRFNet64")
 
 model_dict = {
-    "RFNet": models.net_model.ResidualFeatureNet().cuda(),
-    "DeConvRFNet": models.net_model.DeConvRFNet().cuda(),
-    "FKEfficientNet": models.EfficientNetV2.fk_efficientnetv2_s().cuda(),
-    "RFNWithSTNet": models.net_model.RFNWithSTNet().cuda(),
-    "ConvNet": models.net_model.ConvNet().cuda(),
-    "STNWithRFNet": models.net_model.STNWithRFNet().cuda(),
-    "ResidualSTNet": models.net_model.ResidualSTNet().cuda(),
-    "RFNet64": models.net_model.RFNet64().cuda(),
-    "RFNet64_16": models.net_model.RFNet64_16().cuda()
+    "RFNet": ResidualFeatureNet().cuda(),
+    "FKEfficientNet": fk_efficientnetv2_s().cuda(),
+    "RFNet64": RFNet64().cuda(),
+    "SERFNet64": SERFNet64().cuda(),
+    "STNRFNet64": STNRFNet64().cuda(),
 }
-
 args = parser.parse_args()
 inference = model_dict[args.model].cuda()
 
@@ -269,9 +266,9 @@ inference.load_state_dict(torch.load(args.model_path))
 # Loss = models.loss_function.ShiftedLoss(args.shift_size, args.shift_size)
 # Loss = models.loss_function.WholeRotationShiftedLoss(args.shift_size, args.shift_size, args.angle)
 # Loss = models.loss_function.MaskRSIL(args.shift_size, args.shift_size, args.rotate_angle)
-# Loss = SSIM(data_range=1., size_average=False, channel=64)
-Loss = RSSSIM(data_range=1., size_average=False, win_size=11, channel=64, v_shift=args.shift_size,
-              h_shift=args.shift_size, angle=args.rotate_angle)
+Loss = SSIM(data_range=1., size_average=False, channel=64)
+# Loss = RSSSIM(data_range=1., size_average=False, win_size=11, channel=64, v_shift=args.shift_size,
+#               h_shift=args.shift_size, angle=args.rotate_angle)
 # Loss = SSIMGNN(data_range=1., size_average=False, channel=64, config={'GNN_layers': ['self', 'cross'] * 1,
 #                                                                       "weight": ''})
 # Loss.load_state_dict(torch.load(args.loss_path))

@@ -66,21 +66,34 @@ class ResidualBlock(torch.nn.Module):
 class SEResidualBlock(torch.nn.Module):
     def __init__(self, channels):
         super(SEResidualBlock, self).__init__()
+        # self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        # self.bn1 = torch.nn.BatchNorm2d(channels)
+        # self.conv2 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        # self.bn2 = torch.nn.BatchNorm2d(channels)
+        # self.relu = torch.nn.ReLU()
+        # self.se = SqueezeExcite(int(channels * 2), int(channels * 2), 1)
+        # self.conv3 = torch.nn.Conv2d(int(channels * 2), channels, kernel_size=1, stride=1)
+
         self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
         self.bn1 = torch.nn.BatchNorm2d(channels)
         self.conv2 = ConvLayer(channels, channels, kernel_size=3, stride=1)
         self.bn2 = torch.nn.BatchNorm2d(channels)
         self.relu = torch.nn.ReLU()
-        self.se = SqueezeExcite(int(channels * 2), int(channels * 2), 1)
-        self.conv3 = torch.nn.Conv2d(int(channels * 2), channels, kernel_size=1, stride=1)
+        self.se = SqueezeExcite(int(channels), int(channels), 0.5)
 
     def forward(self, x):
+        # residual = x
+        # out = self.relu(self.bn1(self.conv1(x)))
+        # out = self.relu(self.bn2(self.conv2(out)))
+        # out = torch.cat((residual, out), dim=1)
+        # out = self.se(out)
+        # out = self.relu(self.conv3(out))
+
         residual = x
         out = self.relu(self.bn1(self.conv1(x)))
-        out = self.relu(self.bn2(self.conv2(out)))
-        out = torch.cat((residual, out), dim=1)
+        out = self.bn2(self.conv2(out))
         out = self.se(out)
-        out = self.relu(self.conv3(out))
+        out = out + residual
 
         return out
 
@@ -103,17 +116,22 @@ class STN(torch.nn.Module):
         self.fc_loc = torch.nn.Sequential(
             torch.nn.Linear(int(input_channels * (input_h / 4 - 2) * (input_w / 4 - 2)),
                             int(input_channels * (input_h / 4 - 2) * (input_w / 4 - 2))),
-            torch.nn.ReLU(True),
+            # torch.nn.ReLU(True),
+            torch.nn.Tanh(),
             torch.nn.Linear(int(input_channels * (input_h / 4 - 2) * (input_w / 4 - 2)),
                             int(input_channels * (input_h / 4 - 2))),
-            torch.nn.ReLU(True),
+            # torch.nn.ReLU(True),
+            torch.nn.Tanh(),
             torch.nn.Linear(int(input_channels * (input_h / 4 - 2)), input_channels),
-            torch.nn.ReLU(True),
-            torch.nn.Linear(input_channels, 3 * 2)
+            # torch.nn.ReLU(True),
+            torch.nn.Tanh(),
+            torch.nn.Linear(input_channels, 3 * 2),
+            # new add
+            torch.nn.Tanh()
         )
 
         self.fc_loc[6].weight.data.zero_()
-        self.fc_loc[6].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
+        self.fc_loc[6].bias.data.copy_(torch.tensor([3, 0, 0, 0, 3, 0], dtype=torch.float))
 
     def forward(self, x):
         xs = self.localization(x)
@@ -129,6 +147,16 @@ class STN(torch.nn.Module):
 class STNResidualBlock(torch.nn.Module):
     def __init__(self, channels):
         super(STNResidualBlock, self).__init__()
+        # self.stn = STN(input_channels=channels, input_h=32, input_w=32)
+        #
+        # self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        # self.bn1 = torch.nn.BatchNorm2d(channels)
+        # self.conv2 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        # self.bn2 = torch.nn.BatchNorm2d(channels)
+        # self.relu = torch.nn.ReLU()
+        # self.se = SqueezeExcite(int(channels * 2), int(channels * 2), 1)
+        # self.conv3 = torch.nn.Conv2d(int(channels * 2), channels, kernel_size=1, stride=1)
+
         self.stn = STN(input_channels=channels, input_h=32, input_w=32)
 
         self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
@@ -136,17 +164,23 @@ class STNResidualBlock(torch.nn.Module):
         self.conv2 = ConvLayer(channels, channels, kernel_size=3, stride=1)
         self.bn2 = torch.nn.BatchNorm2d(channels)
         self.relu = torch.nn.ReLU()
-        self.se = SqueezeExcite(int(channels * 2), int(channels * 2), 1)
-        self.conv3 = torch.nn.Conv2d(int(channels * 2), channels, kernel_size=1, stride=1)
+        self.se = SqueezeExcite(channels, channels, 1)
 
     def forward(self, x):
+        # residual = x
+        # out = self.stn(x)
+        # out = self.relu(self.bn1(self.conv1(out)))
+        # out = self.relu(self.bn2(self.conv2(out)))
+        # out = torch.cat((residual, out), dim=1)
+        # out = self.se(out)
+        # out = self.relu(self.conv3(out))
+
         residual = x
         out = self.stn(x)
         out = self.relu(self.bn1(self.conv1(out)))
         out = self.relu(self.bn2(self.conv2(out)))
-        out = torch.cat((residual, out), dim=1)
         out = self.se(out)
-        out = self.relu(self.conv3(out))
+        out = out + residual
 
         return out
 

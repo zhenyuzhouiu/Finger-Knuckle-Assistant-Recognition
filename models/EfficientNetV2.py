@@ -83,6 +83,7 @@ class SqueezeExcite(nn.Module):
     conv_reduce: expand_c  to input_c * se_ratio
     conv_expand: input_c * se_ratio to expand_c
     """
+
     def __init__(self,
                  input_c: int,  # block input channel
                  expand_c: int,  # block expand channel
@@ -112,15 +113,17 @@ class MBConv(nn.Module):
                  stride: int,
                  se_ratio: float,
                  drop_rate: float,
-                 norm_layer: Callable[..., nn.Module]):
+                 norm_layer: Callable[..., nn.Module],
+                 activation_layer: Optional[Callable[..., nn.Module]] = None):
         super(MBConv, self).__init__()
 
         if stride not in [1, 2]:
             raise ValueError("illegal stride value.")
 
         self.has_shortcut = (stride == 1 and input_c == out_c)
-
-        activation_layer = nn.SiLU  # alias Swish
+        if activation_layer is None:
+            activation_layer = nn.SiLU  # alias Swish  (torch>=1.7)
+        # activation_layer = nn.SiLU  # alias Swish
         expanded_c = input_c * expand_ratio
 
         # 在EfficientNetV2中，MBConv中不存在expansion=1的情况所以conv_pw肯定存在
@@ -180,7 +183,8 @@ class FusedMBConv(nn.Module):
                  stride: int,
                  se_ratio: float,
                  drop_rate: float,
-                 norm_layer: Callable[..., nn.Module]):
+                 norm_layer: Callable[..., nn.Module],
+                 activation_layer: Optional[Callable[..., nn.Module]] = None):
         super(FusedMBConv, self).__init__()
 
         assert stride in [1, 2]
@@ -190,8 +194,9 @@ class FusedMBConv(nn.Module):
         self.drop_rate = drop_rate
 
         self.has_expansion = expand_ratio != 1
-
-        activation_layer = nn.SiLU  # alias Swish
+        if activation_layer is None:
+            activation_layer = nn.SiLU  # alias Swish  (torch>=1.7)
+        # activation_layer = nn.SiLU  # alias Swish
         expanded_c = input_c * expand_ratio
 
         # 只有当expand ratio不等于1时才有expand conv
@@ -329,14 +334,40 @@ class FKEfficientNetV2(nn.Module):
             assert len(cnf) == 8
 
         norm_layer = partial(nn.BatchNorm2d, eps=1e-3, momentum=0.1)
-
         stem_filter_num = model_cnf[0][4]
+        stem = OrderedDict()
 
-        self.stem = ConvBNAct(3,
-                              stem_filter_num,
-                              kernel_size=3,
-                              stride=2,
-                              norm_layer=norm_layer)  # 激活函数默认是SiLU
+        stem.update({"conv1": ConvBNAct(3,
+                                        32,
+                                        kernel_size=3,
+                                        stride=2,
+                                        norm_layer=norm_layer,
+                                        activation_layer=nn.ReLU)
+                     })  # 激活函数默认是SiLU
+
+        stem.update({"conv2": ConvBNAct(32,
+                                        32,
+                                        kernel_size=3,
+                                        stride=1,
+                                        norm_layer=norm_layer,
+                                        activation_layer=nn.ReLU)
+                     })
+        stem.update({"conv3": ConvBNAct(32,
+                                        64,
+                                        kernel_size=3,
+                                        stride=2,
+                                        norm_layer=norm_layer,
+                                        activation_layer=nn.ReLU)})
+        stem.update({"conv4": ConvBNAct(64,
+                                        stem_filter_num,
+                                        kernel_size=3,
+                                        stride=1,
+                                        norm_layer=norm_layer,
+                                        activation_layer=nn.ReLU
+
+        )})
+
+        self.stem = nn.Sequential(stem)
 
         total_blocks = sum([i[0] for i in model_cnf])
         block_id = 0
@@ -352,7 +383,8 @@ class FKEfficientNetV2(nn.Module):
                                  stride=cnf[2] if i == 0 else 1,
                                  se_ratio=cnf[-1],
                                  drop_rate=drop_connect_rate * block_id / total_blocks,
-                                 norm_layer=norm_layer))
+                                 norm_layer=norm_layer,
+                                 activation_layer=nn.ReLU))
                 block_id += 1
         self.blocks = nn.Sequential(*blocks)
 
@@ -363,13 +395,8 @@ class FKEfficientNetV2(nn.Module):
                                         64,
                                         kernel_size=3,
                                         stride=1,
-                                        norm_layer=norm_layer)})  # 激活函数默认是SiLU
-
-        head.update({"conv2": ConvBNAct(64,
-                                        1,
-                                        kernel_size=3,
-                                        stride=1,
-                                        norm_layer=norm_layer)})  # 激活函数默认是SiLU
+                                        norm_layer=norm_layer,
+                                        activation_layer=nn.Sigmoid)})  # 激活函数默认是SiLU
 
         self.head = nn.Sequential(head)
 
@@ -390,11 +417,11 @@ class FKEfficientNetV2(nn.Module):
         x = self.stem(x)
         x = self.blocks(x)
 
-        # using ROI Align operations to align feature to the same size
-        b, c, h, w = x.size()
-        box = torch.tensor([0, 0, w - 1, h - 1]).float()
-        list_box = [box]*b
-        x = roi_align(x, list_box, [32, 32])
+        # # using ROI Align operations to align feature to the same size
+        # b, c, h, w = x.size()
+        # box = torch.tensor([0, 0, w - 1, h - 1]).float()
+        # list_box = [box] * b
+        # x = roi_align(x, list_box, [32, 32])
 
         x = self.head(x)
         # output x.size() [b, 1, 32, 32]
@@ -402,98 +429,12 @@ class FKEfficientNetV2(nn.Module):
         return x
 
 
-class FKEfficientNetV2_Nohead(nn.Module):
-    def __init__(self,
-                 model_cnf: list,
-                 drop_connect_rate: float = 0.2):
-        super(FKEfficientNetV2_Nohead, self).__init__()
-
-        for cnf in model_cnf:
-            assert len(cnf) == 8
-
-        norm_layer = partial(nn.BatchNorm2d, eps=1e-3, momentum=0.1)
-
-        stem_filter_num = model_cnf[0][4]
-
-        self.stem = ConvBNAct(3,
-                              stem_filter_num,
-                              kernel_size=3,
-                              stride=2,
-                              norm_layer=norm_layer)  # 激活函数默认是SiLU
-
-        total_blocks = sum([i[0] for i in model_cnf])
-        block_id = 0
-        blocks = []
-        for cnf in model_cnf:
-            repeats = cnf[0]
-            op = FusedMBConv if cnf[-2] == 0 else MBConv
-            for i in range(repeats):
-                blocks.append(op(kernel_size=cnf[1],
-                                 input_c=cnf[4] if i == 0 else cnf[5],
-                                 out_c=cnf[5],
-                                 expand_ratio=cnf[3],
-                                 stride=cnf[2] if i == 0 else 1,
-                                 se_ratio=cnf[-1],
-                                 drop_rate=drop_connect_rate * block_id / total_blocks,
-                                 norm_layer=norm_layer))
-                block_id += 1
-        self.blocks = nn.Sequential(*blocks)
-
-        # initial weights
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out")
-                if m.bias is not None:
-                    nn.init.zeros_(m.bias)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.ones_(m.weight)
-                nn.init.zeros_(m.bias)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                nn.init.zeros_(m.bias)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.stem(x)
-        x = self.blocks(x)
-
-        # using ROI Align operations to align feature to the same size
-        b, c, h, w = x.size()
-        box = torch.tensor([0, 0, w - 1, h - 1]).float()
-        list_box = [box]*b
-
-        # output x.size() [b, 128, 32, 32]
-        x = roi_align(x, list_box, [32, 32])
-
-        return x
-
 def fk_efficientnetv2_s():
-    """
-    FK_EfficientNetV2
-    The original EfficientNetV2 is too deep,
-    """
     # repeat, kernel, stride, expansion, in_c, out_c, operator, se_ratio
-    model_config = [[2, 3, 1, 4, 32, 32, 1, 0.25],
-                    [4, 3, 2, 4, 32, 64, 1, 0.25],
-                    [6, 3, 2, 4, 64, 128, 1, 0.25]]
+    model_config = [[4, 3, 1, 4, 128, 128, 1, 0.25]]
 
     model = FKEfficientNetV2(model_cnf=model_config,
-                             drop_connect_rate=0.2)
-
-    return model
-
-
-def fk_efficientnetv2_s_nohead():
-    """
-    FK_EfficientNetV2_Nohead
-    The original EfficientNetV2 is too deep,
-    """
-    # repeat, kernel, stride, expansion, in_c, out_c, operator, se_ratio
-    model_config = [[2, 3, 1, 4, 32, 32, 1, 0.25],
-                    [4, 3, 2, 4, 32, 64, 1, 0.25],
-                    [6, 3, 2, 4, 64, 128, 1, 0.25]]
-
-    model = FKEfficientNetV2_Nohead(model_cnf=model_config,
-                                    drop_connect_rate=0.2)
+                             drop_connect_rate=0.0)
 
     return model
 

@@ -14,6 +14,33 @@ import torch.nn.functional as F
 import math
 
 
+class SqueezeExcite(torch.nn.Module):
+    """
+    se_ratio: the channels of middle layer of the SE
+    conv_reduce: expand_c  to input_c * se_ratio
+    conv_expand: input_c * se_ratio to expand_c
+    """
+
+    def __init__(self,
+                 input_c: int,  # block input channel
+                 expand_c: int,  # block expand channel
+                 se_ratio: float = 0.25):
+        super(SqueezeExcite, self).__init__()
+        squeeze_c = int(input_c * se_ratio)
+        self.conv_reduce = torch.nn.Conv2d(expand_c, squeeze_c, 1)
+        self.act1 = torch.nn.SiLU()  # alias Swish
+        self.conv_expand = torch.nn.Conv2d(squeeze_c, expand_c, 1)
+        self.act2 = torch.nn.Sigmoid()
+
+    def forward(self, x):
+        scale = x.mean((2, 3), keepdim=True)
+        scale = self.conv_reduce(scale)
+        scale = self.act1(scale)
+        scale = self.conv_expand(scale)
+        scale = self.act2(scale)
+        return scale * x
+
+
 class ResidualBlock(torch.nn.Module):
     """ResidualBlock
     introduced in: https://arxiv.org/abs/1512.03385
@@ -36,27 +63,91 @@ class ResidualBlock(torch.nn.Module):
         return out
 
 
-class ResWithSTNBlock(torch.nn.Module):
-    """ResidualBlock
-    introduced in: https://arxiv.org/abs/1512.03385
-    recommended architecture: http://torch.ch/blog/2016/02/04/resnets.html
-    """
-
+class SEResidualBlock(torch.nn.Module):
     def __init__(self, channels):
-        super(ResWithSTNBlock, self).__init__()
-        self.stn = STN(input_channels=channels, input_h=32, input_w=32)
+        super(SEResidualBlock, self).__init__()
         self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
-        self.in1 = torch.nn.InstanceNorm2d(channels, affine=True)
+        self.bn1 = torch.nn.BatchNorm2d(channels)
         self.conv2 = ConvLayer(channels, channels, kernel_size=3, stride=1)
-        self.in2 = torch.nn.InstanceNorm2d(channels, affine=True)
+        self.bn2 = torch.nn.BatchNorm2d(channels)
         self.relu = torch.nn.ReLU()
+        self.se = SqueezeExcite(int(channels * 2), int(channels * 2), 1)
+        self.conv3 = torch.nn.Conv2d(int(channels * 2), channels, kernel_size=1, stride=1)
+
+    def forward(self, x):
+        residual = x
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn2(self.conv2(out)))
+        out = torch.cat((residual, out), dim=1)
+        out = self.se(out)
+        out = self.relu(self.conv3(out))
+
+        return out
+
+
+class STN(torch.nn.Module):
+    def __init__(self, input_channels, input_h, input_w):
+        super(STN, self).__init__()
+        self.input_channels = input_channels
+        self.input_h = input_h
+        self.input_w = input_w
+
+        self.localization = torch.nn.Sequential(
+            torch.nn.Conv2d(input_channels, input_channels, kernel_size=5),
+            torch.nn.MaxPool2d(2, stride=2),
+            torch.nn.ReLU(True),
+            torch.nn.Conv2d(input_channels, input_channels, kernel_size=3),
+            torch.nn.MaxPool2d(2, stride=2),
+            torch.nn.ReLU(True)
+        )
+        self.fc_loc = torch.nn.Sequential(
+            torch.nn.Linear(int(input_channels * (input_h / 4 - 2) * (input_w / 4 - 2)),
+                            int(input_channels * (input_h / 4 - 2) * (input_w / 4 - 2))),
+            torch.nn.ReLU(True),
+            torch.nn.Linear(int(input_channels * (input_h / 4 - 2) * (input_w / 4 - 2)),
+                            int(input_channels * (input_h / 4 - 2))),
+            torch.nn.ReLU(True),
+            torch.nn.Linear(int(input_channels * (input_h / 4 - 2)), input_channels),
+            torch.nn.ReLU(True),
+            torch.nn.Linear(input_channels, 3 * 2)
+        )
+
+        self.fc_loc[6].weight.data.zero_()
+        self.fc_loc[6].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
+
+    def forward(self, x):
+        xs = self.localization(x)
+        xs = xs.view(-1, int(self.input_channels * (self.input_h / 4 - 2) * (self.input_w / 4 - 2)))
+        theta = self.fc_loc(xs)
+        theta = theta.view(-1, 2, 3)
+        grid = F.affine_grid(theta, x.size(), align_corners=True)
+        x = F.grid_sample(x, grid, align_corners=True)
+
+        return x
+
+
+class STNResidualBlock(torch.nn.Module):
+    def __init__(self, channels):
+        super(STNResidualBlock, self).__init__()
+        self.stn = STN(input_channels=channels, input_h=32, input_w=32)
+
+        self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        self.bn1 = torch.nn.BatchNorm2d(channels)
+        self.conv2 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        self.bn2 = torch.nn.BatchNorm2d(channels)
+        self.relu = torch.nn.ReLU()
+        self.se = SqueezeExcite(int(channels * 2), int(channels * 2), 1)
+        self.conv3 = torch.nn.Conv2d(int(channels * 2), channels, kernel_size=1, stride=1)
 
     def forward(self, x):
         residual = x
         out = self.stn(x)
-        out = self.relu(self.in1(self.conv1(out)))
-        out = self.in2(self.conv2(out))
-        out = out + residual
+        out = self.relu(self.bn1(self.conv1(out)))
+        out = self.relu(self.bn2(self.conv2(out)))
+        out = torch.cat((residual, out), dim=1)
+        out = self.se(out)
+        out = self.relu(self.conv3(out))
+
         return out
 
 
@@ -93,43 +184,6 @@ class ConvLayer(torch.nn.Module):
         out = self.reflection_pad(x)
         out = self.conv2d(out)
         return out
-
-
-class STN(torch.nn.Module):
-    def __init__(self, input_channels, input_h, input_w):
-        super(STN, self).__init__()
-        self.input_channels = input_channels
-        self.input_h = input_h
-        self.input_w = input_w
-
-        self.localization = torch.nn.Sequential(
-            torch.nn.Conv2d(input_channels, input_channels, kernel_size=5),
-            torch.nn.MaxPool2d(2, stride=2),
-            torch.nn.ReLU(True),
-            torch.nn.Conv2d(input_channels, input_channels, kernel_size=3),
-            torch.nn.MaxPool2d(2, stride=2),
-            torch.nn.ReLU(True)
-        )
-        self.fc_loc = torch.nn.Sequential(
-            torch.nn.Linear(int(input_channels * (input_h / 4 - 2) * (input_w / 4 - 2)), int(input_channels * (input_h / 4 - 2))),
-            torch.nn.ReLU(True),
-            torch.nn.Linear(int(input_channels * (input_h / 4 - 2)), input_channels),
-            torch.nn.ReLU(True),
-            torch.nn.Linear(input_channels, 3 * 2)
-        )
-
-        self.fc_loc[4].weight.data.zero_()
-        self.fc_loc[4].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
-
-    def forward(self, x):
-        xs = self.localization(x)
-        xs = xs.view(-1, int(self.input_channels * (self.input_h / 4 - 2) * (self.input_w / 4 - 2)))
-        theta = self.fc_loc(xs)
-        theta = theta.view(-1, 2, 3)
-        grid = F.affine_grid(theta, x.size(), align_corners=True)
-        x = F.grid_sample(x, grid, align_corners=True)
-
-        return x
 
 
 class UpSampleConvLayer(torch.nn.Module):

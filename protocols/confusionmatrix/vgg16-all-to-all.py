@@ -13,6 +13,8 @@ import os
 
 import mpl_toolkits.axes_grid1.axes_size
 
+import models.vgg16_texture_keypoint
+
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import sys
@@ -108,6 +110,7 @@ def get_g_i_score(nfeats, acc_len, feats_start, feats_length, matt):
     i_scores = (np.array(i_scores) - min) / (max - min)
     return np.array(g_scores), np.array(i_scores)
 
+
 def genuine_imposter_upright(test_path):
     subs = subfolders(test_path, preserve_prefix=True)
     subs.sort()
@@ -179,8 +182,8 @@ def genuine_imposter_upright(test_path):
     for i in range(1, feats_32.size(0)):
         matt32[i, i:] = matching_32[i, :-i]
 
-    matt = (matt32 + matt8)/2
-    g_score_8,i_score_8 = get_g_i_score(nfeats, acc_len, feats_start, feats_length, matt8)
+    matt = (matt32 + matt8) / 2
+    g_score_8, i_score_8 = get_g_i_score(nfeats, acc_len, feats_start, feats_length, matt8)
     g_score_32, i_score_32 = get_g_i_score(nfeats, acc_len, feats_start, feats_length, matt32)
     g_score, i_score = get_g_i_score(nfeats, acc_len, feats_start, feats_length, matt)
 
@@ -203,31 +206,32 @@ def k_loss(feats1, feats2):
         loss = loss.data
     return loss.cpu().numpy()
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_path", type=str,
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/01/",
                         dest="test_path")
     parser.add_argument("--out_path", type=str,
-                        default="../../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-17-17-11-50/output/",
+                        default="../../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16Patch_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-21-00-14-46/output/",
                         dest="out_path")
     parser.add_argument("--model_path", type=str,
-                        default="../../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-17-17-11-50/ckpt_epoch_3000.pth",
+                        default="../../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16Patch_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-21-00-14-46/model_epoch_3000.pth",
                         dest="model_path")
     parser.add_argument("--loss_path", type=str,
-                        default="../../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-17-17-11-50/ckpt_epoch_lossk_3000.pth",
+                        default="../../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16Patch_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-21-00-14-46/lossk_epoch_3000.pth",
                         dest="loss_path")
 
     args = parser.parse_args()
     with torch.no_grad():
-        inference = VGG16().cuda()
+        inference = VGG16Patch().cuda()
         inference.load_state_dict(torch.load(args.model_path))
         inference.eval()
 
         texture_l = SSIM(data_range=1., size_average=False, channel=256)
         texture_l.cuda()
         texture_l.eval()
-        keypoint_l = FeatureCorrelation(shape='3D', normalization=False, matching_type='superglue', sinkhorn_it=100)
+        keypoint_l = FeatureCorrelation(shape='3D', normalization=False, matching_type='superglue', sinkhorn_it=200)
         keypoint_l.cuda()
         keypoint_l.load_state_dict(torch.load(args.loss_path))
         keypoint_l.eval()
@@ -236,4 +240,3 @@ if __name__ == "__main__":
         np.save(args.out_path + 'keypoint.npy', {"g_scores": npy8[0], "i_scores": npy8[1], "mmat": npy8[2]})
         np.save(args.out_path + 'texture.npy', {"g_scores": npy32[0], "i_scores": npy32[1], "mmat": npy32[2]})
         np.save(args.out_path + 'combine.npy', {"g_scores": npy[0], "i_scores": npy[1], "mmat": npy[2]})
-

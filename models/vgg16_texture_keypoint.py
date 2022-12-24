@@ -270,6 +270,154 @@ class VGG16(torch.nn.Module):
         return feature32, feature8
 
 
+class VGG16Sequential(torch.nn.Module):
+    def __init__(self):
+        super(VGG16Sequential, self).__init__()
+
+        self.ssim = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(256),
+        )
+
+        self.sigmoid = nn.Sigmoid()
+
+        self.patch = nn.Sequential(
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(512),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x):
+        ssim_x = self.ssim(x)
+        feature32 = self.sigmoid(ssim_x)
+        feature4 = self.patch(ssim_x)
+
+        return feature32, feature4
+
+
+class VGG16Patch(torch.nn.Module):
+    def __init__(self):
+        super(VGG16Patch, self).__init__()
+
+        self.ssim = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(256),
+        )
+
+        self.sigmoid = nn.Sigmoid()
+
+        self.patch = nn.Sequential(
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            # nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            # nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(512, 512, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(512, 512, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(512),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(512, 512, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(512),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x):
+        ssim_x = self.ssim(x)
+        feature32 = self.sigmoid(ssim_x)
+
+        # # image patch
+        # b, c, h, w = ssim_x.shape
+        # if ssim_x.requires_grad:
+        #     patch = torch.zeros([b, int(c * 4 * 4), int(h / 4), int(w / 4)], dtype=x.dtype, requires_grad=True,
+        #                         device=x.device)
+        # else:
+        #     patch = torch.zeros([b, int(c * 4 * 4), int(h / 4), int(w / 4)], dtype=x.dtype, requires_grad=False,
+        #                         device=x.device)
+        #
+        # for dx in range(4):
+        #     for dy in range(4):
+        #         patch[]
+
+        feature4 = self.patch(ssim_x)
+
+        return feature32, feature4
+
+
 class FeatureCorrelation(torch.nn.Module):
     """
     github: https://github.com/ignacio-rocco/cnngeometric_pytorch
@@ -305,6 +453,7 @@ class FeatureCorrelation(torch.nn.Module):
 
             optimal_p = log_optimal_transport(pxy, self.bin_score, iters=self.sinkhorn_it)
             optimal = torch.exp(optimal_p)[:, :-1, :-1]
+
             # ot will be larger with two images are more similar
             ot = torch.sum(optimal.mul(pxy).view(b, -1), -1)
 

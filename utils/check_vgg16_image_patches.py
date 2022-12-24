@@ -1,5 +1,7 @@
 import torch
 import os
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 from models.vgg16_texture_keypoint import *
 from data.data_factory import load_image
 from torchvision import transforms
@@ -55,13 +57,13 @@ def show_tensor(tensor1, tensor2, channels=0):
 
 if __name__ == "__main__":
     # ------------------ load model
-    pre_model = "../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-17-17-11-50/ckpt_epoch_3000.pth"
-    pre_loss = "../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16_quadruplet_ssim-r0-a0.5-2a0.3-hs0_vs0_12-17-17-11-50/ckpt_epoch_lossk_3000.pth"
-    model = VGG16().cuda()
+    pre_model = "../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16Sequential_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-19-23-32-25/model_epoch_2080.pth"
+    pre_loss = "../checkpoint/Joint-Finger-RFNet/MaskLM_VGG16Sequential_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-19-23-32-25/lossk_epoch_2080.pth"
+    model = VGG16Sequential().cuda()
     model.load_state_dict(torch.load(pre_model))
     model.eval()
-    loss_texture = FeatureCorrelation().cuda()
-    loss_texture.load_state_dict(torch.load(pre_loss))
+    loss_keypoint = FeatureCorrelation(sinkhorn_it=200).cuda()
+    loss_keypoint.load_state_dict(torch.load(pre_loss))
     model.eval()
     # ------------------ load image
     img_path1 = "/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/03/001/001-03-1.jpg"
@@ -77,5 +79,5 @@ if __name__ == "__main__":
         b_texture, b_patch = model(img_b)
         show_tensor(a_texture, b_texture, channels=100)
         show_tensor(a_patch, b_patch, channels=100)
-        sinkhorn_d = loss_texture(a_patch, b_patch)
+        sinkhorn_d = loss_keypoint(a_patch, b_patch)
         print("Sinkhorn Distance: " + str(sinkhorn_d) + "\n")

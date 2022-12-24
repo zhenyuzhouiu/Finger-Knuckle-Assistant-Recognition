@@ -5,7 +5,7 @@ from tqdm import tqdm
 import torchvision.utils
 from torch.autograd import Variable
 
-from models.vgg16_texture_keypoint import FeatureExtraction, FeatureCorrelation, VGG16
+from models.vgg16_texture_keypoint import FeatureExtraction, FeatureCorrelation, VGG16Sequential, VGG16Patch
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM
 from torchvision import transforms
 import torchvision
@@ -29,8 +29,9 @@ class Model(object):
         self.samples_subject = args.samples_subject
         self.train_loader, self.dataset_size = self._build_dataset_loader()
         self.inference, self.loss_t, self.loss_k = self._build_model()
-        self.optimizer1 = torch.optim.Adam(self.inference.parameters(), args.learning_rate1)
-        self.optimizer2 = torch.optim.Adam(self.loss_k.parameters(), args.learning_rate2)
+        self.optimizer1 = torch.optim.Adam(self.inference.ssim.parameters(), args.learning_rate1)
+        self.optimizer2 = torch.optim.Adam(self.inference.patch.parameters(), args.learning_rate2)
+        self.optimizer3 = torch.optim.Adam(self.loss_k.parameters(), args.learning_rate2)
 
     def _build_dataset_loader(self):
         transform = transforms.Compose([
@@ -50,7 +51,7 @@ class Model(object):
                 param_group['lr'] *= lr_decay
 
     def _build_model(self):
-        inference = VGG16().cuda()
+        inference = VGG16Patch().cuda()
         inference.cuda()
         inference.train()
         logging("Successfully building FeatureExtraction model")
@@ -77,8 +78,9 @@ class Model(object):
             start_epoch = 1
 
         # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
-        scheduler1 = MultiStepLR(self.optimizer1, milestones=[10], gamma=0.1)
-        scheduler2 = MultiStepLR(self.optimizer2, milestones=[5], gamma=0.1)
+        scheduler1 = MultiStepLR(self.optimizer1, milestones=[10, 500, 2000], gamma=0.1)
+        scheduler2 = MultiStepLR(self.optimizer2, milestones=[5, 1500], gamma=0.1)
+        scheduler3 = MultiStepLR(self.optimizer3,  milestones=[5, 1500], gamma=0.1)
 
         for e in range(start_epoch, self.args.epochs + start_epoch):
             self.inference.train()
@@ -102,6 +104,7 @@ class Model(object):
                 loss.backward()
                 self.optimizer1.step()
                 self.optimizer2.step()
+                self.optimizer3.step()
                 agg_loss += loss.item()
                 agg_loss_t += loss_t.item()
                 agg_loss_k += loss_k.item()
@@ -127,6 +130,7 @@ class Model(object):
 
             scheduler1.step()
             scheduler2.step()
+            scheduler3.step()
         self.writer.close()
 
     def save(self, checkpoint_dir, e):

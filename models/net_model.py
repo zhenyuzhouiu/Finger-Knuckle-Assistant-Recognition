@@ -44,9 +44,9 @@ class ResidualFeatureNet(torch.nn.Module):
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))
         resid1 = self.resid1(conv3)
-        resid2 = self.resid1(resid1)
-        resid3 = self.resid1(resid2)
-        resid4 = self.resid1(resid3)
+        resid2 = self.resid2(resid1)
+        resid3 = self.resid3(resid2)
+        resid4 = self.resid4(resid3)
         conv4 = F.relu(self.conv4(resid4))
         # the origin version is F.relu
         # conv5 = F.sigmoid(self.conv5(conv4))
@@ -163,6 +163,33 @@ class STNResRFNet64v3(torch.nn.Module):
         return conv4
 
 
+class STNResRFNet64v4(torch.nn.Module):
+    def __init__(self):
+        super(STNResRFNet64v4, self).__init__()
+        # Initial convolution layers
+        self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
+        self.conv2 = ConvLayer(32, 64, kernel_size=3, stride=2)
+        self.conv3 = ConvLayer(64, 128, kernel_size=3, stride=1)
+        self.stnres1 = STNResidualBlock(128)
+        self.stnres2 = STNResidualBlock(128)
+        self.stnres3 = STNResidualBlock(128)
+        self.stnres4 = STNResidualBlock(128)
+        self.conv4 = ConvLayer(128, 64, kernel_size=3, stride=1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        conv1 = F.relu(self.conv1(x))
+        conv2 = F.relu(self.conv2(conv1))
+        conv3 = F.relu(self.conv3(conv2))
+        stnres1 = self.stnres1(conv3)
+        stnres2 = self.stnres2(stnres1)
+        stnres3 = self.stnres3(stnres2)
+        stnres4 = self.stnres4(stnres3)
+        conv4 = self.sigmoid(self.conv4(stnres4))
+        return conv4
+
+
 class RFNet64(torch.nn.Module):
     def __init__(self):
         super(RFNet64, self).__init__()
@@ -183,9 +210,9 @@ class RFNet64(torch.nn.Module):
         conv2 = self.relu(self.conv2(conv1))
         conv3 = self.relu(self.conv3(conv2))
         resid1 = self.resid1(conv3)
-        resid2 = self.resid1(resid1)
-        resid3 = self.resid1(resid2)
-        resid4 = self.resid1(resid3)
+        resid2 = self.resid2(resid1)
+        resid3 = self.resid3(resid2)
+        resid4 = self.resid4(resid3)
         conv4 = self.sigmoid(self.conv4(resid4))
 
         # conv4.shape:-> [b, 64, 32, 32]

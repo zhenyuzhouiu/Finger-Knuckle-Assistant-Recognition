@@ -6,7 +6,7 @@ import torchvision.utils
 from torch.autograd import Variable
 
 import models.loss_function
-from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, STNRFNet64, STNResRFNet64
+from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3
 from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM
 from torchvision import transforms
@@ -32,7 +32,9 @@ model_dict = {
     "RFNet64": RFNet64().cuda(),
     "SERFNet64": SERFNet64().cuda(),
     "STNRFNet64": STNRFNet64().cuda(),
-    "STNResRFNet64": STNResRFNet64().cuda()
+    "STNResRFNet64": STNResRFNet64().cuda(),
+    "STNResRFNet64v2": STNResRFNet64v2().cuda(),
+    "STNResRFNet64v3": STNResRFNet64v3().cuda()
 }
 
 
@@ -127,7 +129,8 @@ class Model(object):
                 param_group['lr'] *= lr_decay
 
     def _build_model(self, args):
-        if args.model not in ["RFNet", "FKEfficientNet", "RFNet64", "RFNet64_16", "SERFNet64", "STNRFNet64", "STNResRFNet64"]:
+        if args.model not in ["RFNet", "FKEfficientNet", "RFNet64", "RFNet64_16", "SERFNet64",
+                              "STNRFNet64", "STNResRFNet64", "STNResRFNet64v2", "STNResRFNet64v3"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         if args.model in ["FusionNet", "AssistantModel"]:

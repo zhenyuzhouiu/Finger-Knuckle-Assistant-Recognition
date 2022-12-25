@@ -13,9 +13,9 @@ import argparse
 from plotroc_basic import *
 
 src_npy = [
-    '../../checkpoint/Joint-Finger-RFNet/MaskLM_FKEfficientNet_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-10-55-33/output/01-protocol.npy',
-    '../../checkpoint/Joint-Finger-RFNet/MaskLM_FKEfficientNet_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-10-55-33/output/02-protocol.npy',
-    '../../checkpoint/Joint-Finger-RFNet/MaskLM_FKEfficientNet_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-10-55-33/output/04-protocol.npy',
+    '../../checkpoint/Joint-Finger-RFNet/MaskLM_SERFNet64_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-22-02-34/output/01-protocol.npy',
+    '../../checkpoint/Joint-Finger-RFNet/MaskLM_SERFNet64_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-22-02-34/output/02-protocol.npy',
+    '../../checkpoint/Joint-Finger-RFNet/MaskLM_SERFNet64_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-22-02-34/output/04-protocol.npy',
     '../../checkpoint/Joint-Finger-RFNet/MaskLM_FKEfficientNet_quadruplet_rsssim-r2-a0.6-2a0.3-hs2_vs2_12-21-16-38-10/output/05-protocol.npy',
     '../../checkpoint/Joint-Finger-RFNet/MaskLM_FKEfficientNet_quadruplet_rsssim-r2-a0.6-2a0.3-hs2_vs2_12-21-16-38-10/output/06-protocol.npy',
     '../../checkpoint/Joint-Finger-RFNet/MaskLM_FKEfficientNet_quadruplet_rsssim-r2-a0.6-2a0.3-hs2_vs2_12-21-16-38-10/output/07-protocol.npy',
@@ -48,7 +48,7 @@ color = ['#000000',
          '#808000',
          '#ff00ff',
          '#ff0000']
-dst = '../../checkpoint/Joint-Finger-RFNet/MaskLM_FKEfficientNet_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-10-55-33/output/roc.pdf'
+dst = '../../checkpoint/Joint-Finger-RFNet/MaskLM_SERFNet64_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-22-02-34/output/roc.pdf'
 
 for i in range(3):
     data = np.load(src_npy[i], allow_pickle=True)[()]

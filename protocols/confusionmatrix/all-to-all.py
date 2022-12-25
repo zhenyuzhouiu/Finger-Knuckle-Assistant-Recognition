@@ -12,14 +12,14 @@
 import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import sys
 from PIL import Image
 import numpy as np
 import torch
 import cv2
 import argparse
-from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, STNRFNet64
+from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, STNRFNet64, STNResRFNet64
 from models.EfficientNetV2 import efficientnetv2_s, ConvBNAct, fk_efficientnetv2_s
 from torch.autograd import Variable
 import models.EfficientNetV2
@@ -236,10 +236,10 @@ parser.add_argument("--test_path", type=str,
                     default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/01/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="../../checkpoint/Joint-Finger-RFNet/MaskLM_STNRFNet64_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-10-51-41/output/01-protocol.npy",
+                    default="../../checkpoint/Joint-Finger-RFNet/MaskLM_STNRFNet64_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-22-48-25/output/01-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="../../checkpoint/Joint-Finger-RFNet/MaskLM_STNRFNet64_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-10-51-41/ckpt_epoch_3000.pth",
+                    default="../../checkpoint/Joint-Finger-RFNet/MaskLM_STNRFNet64_quadruplet_ssim-r2-a0.6-2a0.3-hs2_vs2_12-24-22-48-25/ckpt_epoch_3000.pth",
                     dest="model_path")
 parser.add_argument("--loss_path", type=str,
                     default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/ckpt_epoch_1500.pth",
@@ -258,6 +258,7 @@ model_dict = {
     "RFNet64": RFNet64().cuda(),
     "SERFNet64": SERFNet64().cuda(),
     "STNRFNet64": STNRFNet64().cuda(),
+    "STNResRFNet64": STNResRFNet64().cuda()
 }
 args = parser.parse_args()
 inference = model_dict[args.model].cuda()

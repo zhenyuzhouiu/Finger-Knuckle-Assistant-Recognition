@@ -36,7 +36,7 @@ def build_parser():
     parser.add_argument('--n_tuple', type=str, dest='n_tuple',
                         default='quadruplet', help="how to select the input tuple, triplet, quadruplet, feature")
     # Model
-    parser.add_argument('--model', type=str, dest='model', default="STNRFNet64")
+    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet64v2")
     parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssim")
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
 

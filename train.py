@@ -36,12 +36,16 @@ def build_parser():
     parser.add_argument('--n_tuple', type=str, dest='n_tuple',
                         default='quadruplet', help="how to select the input tuple, triplet, quadruplet, feature")
     # Model
-    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet64v2")
+    parser.add_argument('--model', type=str, dest='model', default="RFNet64")
     parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssim")
-    parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
+    parser.add_argument('--if_augment', type=bool, dest="if_augment", default=True)
+    parser.add_argument('--if_hsv', type=bool, dest="if_hsv", default=True)
+    parser.add_argument('--if_rotation', type=bool, dest="if_rotation", default=False)
+    parser.add_argument('--if_translation', type=bool, dest="if_translation", default=False)
+    parser.add_argument('--if_scale', type=bool, dest="if_scale", default=False)
 
     # Training StrategyResidualSTNet
-    parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
+    parser.add_argument('--batch_size', type=int, dest='batch_size', default=2)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
     parser.add_argument('--learning_rate1', type=float, dest='learning_rate1', default=1e-3)
     parser.add_argument('--learning_rate2', type=float, dest='learning_rate2', default=1e-2)
@@ -76,16 +80,11 @@ def main():
     this_datetime = datetime.datetime.now().strftime('%m-%d-%H-%M-%S')
     args.checkpoint_dir = os.path.join(
         args.checkpoint_dir,
-        "{}_{}_{}_{}-r{}-a{}-2a{}-hs{}_vs{}_{}".format(
+        "{}_{}_{}_{}_{}".format(
             args.db_prefix,
             args.model,
             args.n_tuple,
             args.loss_type,
-            int(args.rotate_angle),
-            float(args.alpha),
-            float(args.alpha2),
-            int(args.horizontal_size),
-            int(args.vertical_size),
             this_datetime
         )
     )

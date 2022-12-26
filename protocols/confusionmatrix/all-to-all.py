@@ -19,7 +19,7 @@ import numpy as np
 import torch
 import cv2
 import argparse
-from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, STNRFNet64, STNResRFNet64
+from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3
 from models.EfficientNetV2 import efficientnetv2_s, ConvBNAct, fk_efficientnetv2_s
 from torch.autograd import Variable
 import models.EfficientNetV2
@@ -233,13 +233,13 @@ def genuine_imposter_upright(test_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test_path", type=str,
-                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/01/",
+                    default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/04/",
                     dest="test_path")
 parser.add_argument("--out_path", type=str,
-                    default="../../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet64_quadruplet_ssim/output/01-protocol.npy",
+                    default="../../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_STNResRFNet64v3_quadruplet_ssim/output/04-protocol.npy",
                     dest="out_path")
 parser.add_argument("--model_path", type=str,
-                    default="../../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet64_quadruplet_ssim/ckpt_epoch_3000.pth",
+                    default="../../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_STNResRFNet64v3_quadruplet_ssim/ckpt_epoch_3000.pth",
                     dest="model_path")
 parser.add_argument("--loss_path", type=str,
                     default="/media/zhenyuzhou/Data/Project/Finger-Knuckle-2018/Finger-Knuckle-Assistant-Recognition/checkpoint/Joint-Finger-RFNet/MaskLM_RFNet64_quadruplet_rsssim-lr0.001-r2-a0.6-2a0.3-hs2_vs2_12-04-14-54-25/ckpt_epoch_1500.pth",
@@ -250,7 +250,7 @@ parser.add_argument('--block_size', type=int, dest="block_size", default=8)
 parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=2)
 parser.add_argument("--top_k", type=int, dest="top_k", default=16)
 parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-parser.add_argument('--model', type=str, dest='model', default="STNResRFNet64")
+parser.add_argument('--model', type=str, dest='model', default="STNResRFNet64v3")
 
 model_dict = {
     "RFNet": ResidualFeatureNet().cuda(),
@@ -258,7 +258,9 @@ model_dict = {
     "RFNet64": RFNet64().cuda(),
     "SERFNet64": SERFNet64().cuda(),
     "STNRFNet64": STNRFNet64().cuda(),
-    "STNResRFNet64": STNResRFNet64().cuda()
+    "STNResRFNet64": STNResRFNet64().cuda(),
+    "STNResRFNet64v2": STNResRFNet64v2().cuda(),
+    "STNResRFNet64v3": STNResRFNet64v3().cuda()
 }
 args = parser.parse_args()
 inference = model_dict[args.model].cuda()

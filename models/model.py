@@ -6,7 +6,8 @@ import torchvision.utils
 from torch.autograd import Variable
 
 import models.loss_function
-from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3
+from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64,\
+    STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, DilateRFNet64
 from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM
 from torchvision import transforms
@@ -34,7 +35,9 @@ model_dict = {
     "STNRFNet64": STNRFNet64().cuda(),
     "STNResRFNet64": STNResRFNet64().cuda(),
     "STNResRFNet64v2": STNResRFNet64v2().cuda(),
-    "STNResRFNet64v3": STNResRFNet64v3().cuda()
+    "STNResRFNet64v3": STNResRFNet64v3().cuda(),
+    "DilateRFNet64": DilateRFNet64().cuda(),
+    "DeformRFNet64": DeformRFNet64().cuda(),
 }
 
 
@@ -59,7 +62,8 @@ class Model(object):
         ])
         train_dataset = Factory(args.train_path, args.feature_path, args.input_size, transform=transform,
                                 valid_ext=['.bmp', '.jpg', '.JPG'], train=True, n_tuple=args.n_tuple,
-                                if_augment=args.if_augment)
+                                if_aug=args.if_augment, if_hsv=args.if_hsv, if_rotation=args.if_rotation,
+                                if_translation=args.if_translation, if_scale=args.if_scale)
         logging("Successfully Load {} as training dataset...".format(args.train_path))
         train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
 
@@ -78,7 +82,7 @@ class Model(object):
             self.writer.add_image(tag="positive", img_tensor=positive_grid)
             negative_grid = torchvision.utils.make_grid(example_negative)
             self.writer.add_image(tag="negative", img_tensor=negative_grid)
-        elif args.n_tuple == "quadruplet":
+        else :
             # for showing quadruplet
             examples = iter(train_loader)
             example_data, example_target = examples.next()
@@ -102,24 +106,6 @@ class Model(object):
             self.writer.add_image(tag="negative", img_tensor=negative_grid)
             negative2_grid = torchvision.utils.make_grid(example_negative2)
             self.writer.add_image(tag="negative2", img_tensor=negative2_grid)
-        else:
-            examples = iter(train_loader)
-            example_data, example_target, example_feature8, example_feature16, example_feature32 = examples.next()
-            example_anchor = example_data[:, 0:3, :, :]
-            example_positive = example_data[:, 3:3 * self.samples_subject, :, :].reshape(-1, 3, example_anchor.size(2),
-                                                                                         example_anchor.size(3))
-            example_negative = example_data[:, 3 * self.samples_subject:3 * 3 * self.samples_subject, :, :].reshape(-1,
-                                                                                                                    3,
-                                                                                                                    example_anchor.size(
-                                                                                                                        2),
-                                                                                                                    example_anchor.size(
-                                                                                                                        3))
-            anchor_grid = torchvision.utils.make_grid(example_anchor)
-            self.writer.add_image(tag="anchor", img_tensor=anchor_grid)
-            positive_grid = torchvision.utils.make_grid(example_positive)
-            self.writer.add_image(tag="positive", img_tensor=positive_grid)
-            negative_grid = torchvision.utils.make_grid(example_negative)
-            self.writer.add_image(tag="negative", img_tensor=negative_grid)
 
         return train_loader, len(train_dataset)
 
@@ -130,24 +116,13 @@ class Model(object):
 
     def _build_model(self, args):
         if args.model not in ["RFNet", "FKEfficientNet", "RFNet64", "RFNet64_16", "SERFNet64",
-                              "STNRFNet64", "STNResRFNet64", "STNResRFNet64v2", "STNResRFNet64v3"]:
+                              "STNRFNet64", "STNResRFNet64", "STNResRFNet64v2", "STNResRFNet64v3",
+                              "DilateRFNet64", "DeformRFNet64"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
-        if args.model in ["FusionNet", "AssistantModel"]:
-            data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
-            data = Variable(data, requires_grad=False)
-            s32 = torch.randn([1280, 8, 8]).unsqueeze(0).cuda()
-            s32 = Variable(s32, requires_grad=False)
-            s16 = torch.randn([640, 16, 16]).unsqueeze(0).cuda()
-            s16 = Variable(s16, requires_grad=False)
-            s8 = torch.randn([320, 32, 32]).unsqueeze(0).cuda()
-            s8 = Variable(s8, requires_grad=False)
-            self.writer.add_graph(inference, [data, s8, s16, s32])
-        else:
-            data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
-            data = Variable(data, requires_grad=False)
-            # mask = torch.ones([1, 32, 32]).unsqueeze(0).cuda()
-            self.writer.add_graph(inference, [data])
+        data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
+        data = Variable(data, requires_grad=False)
+        self.writer.add_graph(inference, [data])
         inference.cuda()
         inference.train()
 

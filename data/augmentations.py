@@ -81,7 +81,7 @@ def random_perspective(im,
                        border=(0, 0)):
     """
     output:->
-    ======== im, mask
+    ======== im
     """
     # torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 10))
     # targets = [cls, xyxy]
@@ -125,54 +125,8 @@ def random_perspective(im,
         else:  # affine
             im = cv2.warpAffine(im, M[:2], dsize=(width, height), borderValue=(0, 0, 0))
 
-    # ===================================================================== geometric transformation of mask
-    mask_h = int((im.shape[0] + border[0] * 2)/4)  # shape(h,w,c)
-    mask_w = int((im.shape[1] + border[1] * 2)/4)
-    # the RFN net will down sample image by 4
-    # mask.shape:-> (32, 32, 1)
-    mask = np.ones((mask_h, mask_w, 1), dtype=im.dtype)
-
-    # Center
-    C = np.eye(3)
-    C[0, 2] = -mask.shape[1] / 2  # x translation (pixels)
-    C[1, 2] = -mask.shape[0] / 2  # y translation (pixels)
-
-    # Perspective
-    P = np.eye(3)
-    P[2, 0] = random.uniform(-perspective, perspective)  # x perspective (about y)
-    P[2, 1] = random.uniform(-perspective, perspective)  # y perspective (about x)
-
-    # Rotation and Scale
-    R = np.eye(3)
-    a = random.uniform(-degrees, degrees)
-    # a += random.choice([-180, -90, 0, 90])  # add 90deg rotations to small rotations
-    s = random.uniform(1 - scale, 1 + scale)
-    # s = 2 ** random.uniform(-scale, scale)
-    R[:2] = cv2.getRotationMatrix2D(angle=a, center=(0, 0), scale=s)
-
-    # Shear
-    S = np.eye(3)
-    S[0, 1] = math.tan(random.uniform(-shear, shear) * math.pi / 180)  # x shear (deg)
-    S[1, 0] = math.tan(random.uniform(-shear, shear) * math.pi / 180)  # y shear (deg)
-
-    # Translation
-    T = np.eye(3)
-    T[0, 2] = random.uniform(0.5 - translate, 0.5 + translate) * mask_w  # x translation (pixels)
-    T[1, 2] = random.uniform(0.5 - translate, 0.5 + translate) * mask_h  # y translation (pixels)
-
-    # Combined rotation matrix
-    M = T @ S @ R @ P @ C  # order of operations (right to left) is IMPORTANT
-    if (border[0] != 0) or (border[1] != 0) or (M != np.eye(3)).any():  # image changed
-        if perspective:
-            mask = np.expand_dims(
-                cv2.warpPerspective(mask, M, dsize=(mask_w, mask_h), borderValue=(0, 0, 0)), axis=0)
-        else:  # affine
-            mask = np.expand_dims(
-                cv2.warpAffine(mask, M[:2], dsize=(mask_w, mask_h), borderValue=(0, 0, 0)), axis=0)
-
     # im.shape:-> [h, w, 3]
-    # mask.shape:-> [h/4, w/4, 1]
-    return im, mask
+    return im
 
 
 class ToTensor:

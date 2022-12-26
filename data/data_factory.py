@@ -156,7 +156,8 @@ def reminderpick_list(src, list_except=None):
 
 class Factory(torch.utils.data.Dataset):
     def __init__(self, img_path, feature_path, input_size,
-                 transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True, n_tuple="triplet", if_augment=False):
+                 transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True, n_tuple="triplet",
+                 if_aug=False, if_hsv=False, if_rotation=False, if_translation=False, if_scale=False):
         self.ext = valid_ext
         self.transform = transform
         self._has_ext = lambda f: True if [e for e in self.ext if e in f] else False
@@ -166,7 +167,11 @@ class Factory(torch.utils.data.Dataset):
         # input_size:-> (w, h)
         self.input_size = input_size
         self.n_tuple = n_tuple
-        self.if_augment = if_augment
+        self.if_aug = if_aug
+        self.if_hsv = if_hsv
+        self.if_rotation = if_rotation
+        self.if_translation = if_translation
+        self.if_scale = if_scale
 
         if not exists(self.folder):
             raise RuntimeError('Dataset not found: {}'.format(self.folder))
@@ -276,25 +281,19 @@ class Factory(torch.utils.data.Dataset):
         if self.if_augment:
             src = load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)
             src = augment_hsv(src)
-            src, ma = random_perspective(src)
+            src = random_perspective(src)
             img = [src]
-            mask = [ma]
         else:
             img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
             # self.input_size:-> (w, h)
-            ma = np.ones((1, int(self.input_size[1] / 4), int(self.input_size[0] / 4)), dtype=img[0].dtype)
-            mask = [ma]
         for p in positive:
             if self.if_augment:
                 src = load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size)
                 src = augment_hsv(src)
-                src, ma = random_perspective(src)
+                src = random_perspective(src)
                 img.append(src)
-                mask.append(ma)
             else:
                 img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
-                ma = np.ones((1, int(self.input_size[1] / 4), int(self.input_size[0] / 4)), dtype=img[0].dtype)
-                mask.append(ma)
 
         # Negative samples 2 times than positive
         for i in range(2):
@@ -305,13 +304,10 @@ class Factory(torch.utils.data.Dataset):
                 if self.if_augment:
                     src = load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size)
                     src = augment_hsv(src)
-                    src, ma = random_perspective(src)
+                    src = random_perspective(src)
                     img.append(src)
-                    mask.append(ma)
                 else:
                     img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
-                    ma = np.ones((1, int(self.input_size[1] / 4), int(self.input_size[0] / 4)), dtype=img[0].dtype)
-                    mask.append(ma)
 
         # img is the data
         # junk is the label
@@ -325,10 +321,7 @@ class Factory(torch.utils.data.Dataset):
             # In the other cases, tensors are returned without normalization.
             img = self.transform(img)
 
-        mask = np.concatenate(mask, axis=0)
-        mask = (torch.from_numpy(mask)).type(img.dtype)
-
-        return img, mask, junk
+        return img, junk
 
     def _feature_trainitems(self, index):
         # ======================= get images and corresponding features and label
@@ -393,9 +386,33 @@ class Factory(torch.utils.data.Dataset):
         anchor = randpick_list(self.fdict[selected_folder])
         positive = reminderpick_list(self.fdict[selected_folder], [anchor])
 
-        img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
+        if self.if_aug:
+            src = load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)
+            if self.if_hsv:
+                src = augment_hsv(src)
+            if self.if_rotation:
+                src = random_perspective(src, degrees=5, translate=0, scale=0)
+            if self.if_translation:
+                src = random_perspective(src, degrees=0, translate=0.1, scale=0)
+            if self.if_scale:
+                src = random_perspective(src, degrees=0, translate=0, scale=0.1)
+            img = [src]
+        else:
+            img = [load_image(join(self.folder, selected_folder, anchor), options='RGB', size=self.input_size)]
         for p in positive:
-            img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
+            if self.if_aug:
+                src = load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size)
+                if self.if_hsv:
+                    src = augment_hsv(src)
+                if self.if_rotation:
+                    src = random_perspective(src, degrees=5, translate=0, scale=0)
+                if self.if_translation:
+                    src = random_perspective(src, degrees=0, translate=0.1, scale=0)
+                if self.if_scale:
+                    src = random_perspective(src, degrees=0, translate=0, scale=0.1)
+                img.append(src)
+            else:
+                img.append(load_image(join(self.folder, selected_folder, p), options='RGB', size=self.input_size))
 
         # Negative samples 2 times than positive
         # the first class negative sample
@@ -404,14 +421,38 @@ class Factory(torch.utils.data.Dataset):
             list_folders.append(negative_folder)
             negative = reminderpick_list(self.fdict[negative_folder])
             for n in negative:
-                img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
+                if self.if_aug:
+                    src = load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size)
+                    if self.if_hsv:
+                        src = augment_hsv(src)
+                    if self.if_rotation:
+                        src = random_perspective(src, degrees=5, translate=0, scale=0)
+                    if self.if_translation:
+                        src = random_perspective(src, degrees=0, translate=0.1, scale=0)
+                    if self.if_scale:
+                        src = random_perspective(src, degrees=0, translate=0, scale=0.1)
+                    img.append(src)
+                else:
+                    img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
 
         for i in range(1):
             negative_folder = randpick_list(self.subfolder_names, list_folders)
             list_folders.append(negative_folder)
             negative = reminderpick_list(self.fdict[negative_folder])
             for n in negative:
-                img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
+                if self.if_aug:
+                    src = load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size)
+                    if self.if_hsv:
+                        src = augment_hsv(src)
+                    if self.if_rotation:
+                        src = random_perspective(src, degrees=5, translate=0, scale=0)
+                    if self.if_translation:
+                        src = random_perspective(src, degrees=0, translate=0.1, scale=0)
+                    if self.if_scale:
+                        src = random_perspective(src, degrees=0, translate=0, scale=0.1)
+                    img.append(src)
+                else:
+                    img.append(load_image(join(self.folder, negative_folder, n), options='RGB', size=self.input_size))
 
         # img is the data
         # junk is the label

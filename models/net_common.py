@@ -63,6 +63,28 @@ class ResidualBlock(torch.nn.Module):
         return out
 
 
+class ResBlock(torch.nn.Module):
+    """ResidualBlock
+    introduced in: https://arxiv.org/abs/1512.03385
+    recommended architecture: http://torch.ch/blog/2016/02/04/resnets.html
+    """
+
+    def __init__(self, channels):
+        super(ResBlock, self).__init__()
+        self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        self.bn1 = torch.nn.BatchNorm2d(channels)
+        self.conv2 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        self.bn2 = torch.nn.BatchNorm2d(channels)
+        self.relu = torch.nn.ReLU()
+
+    def forward(self, x):
+        residual = x
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out = out + residual
+        return out
+
+
 class SEResidualBlock(torch.nn.Module):
     def __init__(self, channels):
         super(SEResidualBlock, self).__init__()
@@ -185,19 +207,36 @@ class STNResidualBlock(torch.nn.Module):
         return out
 
 
-class DeConvResBlock(torch.nn.Module):
+class DeformResBlock(torch.nn.Module):
     def __init__(self, channels):
-        super(DeConvResBlock, self).__init__()
+        super(DeformResBlock, self).__init__()
         self.conv1 = DeformableConv2d2v(channels, channels, kernel_size=3, stride=1)
-        self.in1 = torch.nn.BatchNorm2d(num_features=channels)
+        self.bn1 = torch.nn.BatchNorm2d(num_features=channels)
         self.conv2 = DeformableConv2d2v(channels, channels, kernel_size=3, stride=1)
-        self.in2 = torch.nn.BatchNorm2d(num_features=channels)
+        self.bn2 = torch.nn.BatchNorm2d(num_features=channels)
         self.relu = torch.nn.ReLU()
 
     def forward(self, x):
         residual = x
-        out = self.relu(self.in1(self.conv1(x)))
-        out = self.in2(self.conv2(out))
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out = out + residual
+        return out
+
+
+class DilateResBlock(torch.nn.Module):
+    def __init__(self, channels):
+        super(DilateResBlock, self).__init__()
+        self.conv1 = torch.nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, dilation=2)
+        self.bn1 = torch.nn.BatchNorm2d(num_features=channels)
+        self.conv2 = torch.nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, dilation=2)
+        self.bn2 = torch.nn.BatchNorm2d(num_features=channels)
+        self.relu = torch.nn.ReLU()
+
+    def forward(self, x):
+        residual = x
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
         out = out + residual
         return out
 

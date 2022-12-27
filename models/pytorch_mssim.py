@@ -314,7 +314,8 @@ class RSSSIM(torch.nn.Module):
             nonnegative_ssim=False,
             v_shift=0,
             h_shift=0,
-            angle=0
+            angle=0,
+            step=0,
     ):
         r""" class for ssim
         Args:
@@ -338,6 +339,7 @@ class RSSSIM(torch.nn.Module):
         self.v_shift = v_shift
         self.h_shift = h_shift
         self.angle = angle
+        self.step = step
 
     def forward(self, X, Y):
         b, c, h, w = X.shape
@@ -353,9 +355,9 @@ class RSSSIM(torch.nn.Module):
             min_dist = 1 - ssim(X, Y, data_range=self.data_range, size_average=self.size_average,
                                 win=self.win, K=self.K, nonnegative_ssim=self.nonnegative_ssim)
             return min_dist
-        for tx in range(-self.h_shift, self.h_shift + 1):
-            for ty in range(-self.v_shift, self.v_shift + 1):
-                for a in range(-self.angle, self.angle + 1):
+        for tx in range(-self.h_shift, self.h_shift + 1, self.step):
+            for ty in range(-self.v_shift, self.v_shift + 1, self.step):
+                for a in range(-self.angle, self.angle + 1, self.step):
                     radian_a = a * math.pi / 180.
                     ratio_tx = 2 * tx / w
                     ratio_ty = 2 * ty / h

@@ -6,7 +6,7 @@ import torch
 import cv2
 import argparse
 from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
-    STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, DilateRFNet64
+    STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, DilateRFNet64, RFNet64Relu, STNResRFNet64v2Relu
 from torch.autograd import Variable
 from protocols.plot.plotroc_basic import *
 from protocols.confusionmatrix.protocol_util import *
@@ -25,6 +25,8 @@ model_dict = {
     "STNResRFNet64v3": STNResRFNet64v3(),
     "DeformRFNet64": DeformRFNet64(),
     "DilateRFNet64": DilateRFNet64(),
+    "RFNet64Relu": RFNet64Relu(),
+    "STNResRFNet64v2Relu": STNResRFNet64v2Relu()
 }
 
 
@@ -154,6 +156,17 @@ def genuine_imposter_upright(test_path, image_size, options, inference, loss_mod
             i_scores += list(matt[i, i_select])
 
     print("\n [*] Done")
+    g_scores = np.array(g_scores)
+    i_scores = np.array(i_scores)
+    g_min = np.min(g_scores)
+    g_max = np.max(g_scores)
+    i_min = np.min(i_scores)
+    i_max = np.max(i_scores)
+    min = np.min(np.array([g_min, i_min]))
+    max = np.max(np.array([g_max, i_max]))
+    g_scores = (g_scores - min) / (max - min)
+    i_scores = (i_scores - min) / (max - min)
+
     return np.array(g_scores), np.array(i_scores), matt
 
 

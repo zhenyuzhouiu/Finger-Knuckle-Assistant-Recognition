@@ -84,7 +84,7 @@ class Model(object):
             self.writer.add_image(tag="positive", img_tensor=positive_grid)
             negative_grid = torchvision.utils.make_grid(example_negative)
             self.writer.add_image(tag="negative", img_tensor=negative_grid)
-        else :
+        else:
             # for showing quadruplet
             examples = iter(train_loader)
             example_data, example_target = examples.next()
@@ -145,7 +145,7 @@ class Model(object):
             else:
                 if args.loss_type == "rsssim":
                     loss = RSSSIM(data_range=1., size_average=False, channel=64, v_shift=args.vertical_size,
-                                  h_shift=args.horizontal_size, angle=args.rotate_angle).cuda()
+                                  h_shift=args.horizontal_size, angle=args.rotate_angle, step=args.step_size).cuda()
                     logging("Successfully building rsssim triplet loss")
                 else:
                     raise RuntimeError('Please make sure your loss function!')

@@ -13,6 +13,7 @@ from protocols.confusionmatrix.protocol_util import *
 from models.pytorch_mssim import SSIM, RSSSIM
 import matplotlib.pyplot as plt
 import matplotlib
+import tqdm
 
 model_dict = {
     "RFNet": ResidualFeatureNet(),
@@ -35,7 +36,7 @@ def _loss(feats1, feats2, Loss):
     return loss.cpu().numpy()
 
 
-def calc_feats_more(*paths, size=(208, 184), options='RGB', inference):
+def calc_feats_more(*paths, size=(208, 184), options='RGB', inference, gpu_num):
     """
     1.Read a batch of images from the given paths
     2.Normalize image from 0-255 to 0-1
@@ -74,13 +75,13 @@ def calc_feats_more(*paths, size=(208, 184), options='RGB', inference):
         # mask[i, :, :, :] = ma
     container /= 255.
     container = torch.from_numpy(container.astype(np.float32))
-    container = container.cuda()
+    container = container.cuda(gpu_num)
     container = Variable(container, requires_grad=False)
     fv = inference(container)
     return fv.cpu().data.numpy()
 
 
-def genuine_imposter_upright(test_path, image_size, options, inference, loss_model):
+def genuine_imposter_upright(test_path, image_size, options, inference, loss_model, gpu_num):
     subs = subfolders(test_path, preserve_prefix=True)
     subs.sort()
     feats_all = []
@@ -91,15 +92,16 @@ def genuine_imposter_upright(test_path, image_size, options, inference, loss_mod
         subims.sort()
         nfeats += len(subims)
         feats_length.append(len(subims))
-        fm = calc_feats_more(*subims, size=image_size, options=options, inference=inference)
+        fm = calc_feats_more(*subims, size=image_size, options=options, inference=inference, gpu_num=gpu_num)
         feats_all.append(fm)
     feats_length = np.array(feats_length)
     acc_len = np.cumsum(feats_length)
     feats_start = acc_len - feats_length
 
-    feats_all = torch.from_numpy(np.concatenate(feats_all, 0)).cuda()
+    feats_all = torch.from_numpy(np.concatenate(feats_all, 0)).cuda(gpu_num)
     matching_matrix = np.ones((nfeats, nfeats)) * 1e5
-    for i in range(1, feats_all.size(0)):
+
+    for i in tqdm.tqdm(range(1, feats_all.size(0))):
         x = feats_all[:-i, :, :, :]
         y = feats_all[i:, :, :, :]
         bs, ch, he, wi = x.shape
@@ -122,7 +124,6 @@ def genuine_imposter_upright(test_path, image_size, options, inference, loss_mod
         else:
             loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :], Loss=loss_model)
         matching_matrix[:-i, i] = loss
-        print("[*] Pre-processing matching dict for {} / {} \r".format(i, feats_all.size(0)))
 
     matt = np.ones_like(matching_matrix) * 1e5
     matt[0, :] = matching_matrix[0, :]
@@ -130,7 +131,6 @@ def genuine_imposter_upright(test_path, image_size, options, inference, loss_mod
         matt[i, i:] = matching_matrix[i, :-i]
         # for j in range(i):
         #     matt[i, j] = matching_matrix[j, i - j]
-    print("\n [*] Done")
 
     g_scores = []
     i_scores = []
@@ -161,7 +161,9 @@ def draw_roc(src_mat, color, label, dst):
     for i in range(len(src_mat)):
         data = io.loadmat(src_mat[i])
         g_scores = np.array(data['g_scores'])
+        g_scores = np.squeeze(g_scores)
         i_scores = np.array(data['i_scores'])
+        i_scores = np.squeeze(i_scores)
 
         print('[*] Source file: {}'.format(src_mat[i]))
         print('[*] Target output file: {}'.format(dst))
@@ -211,23 +213,26 @@ if __name__ == '__main__':
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
     parser.add_argument("--out_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_STNResRFNet64v3_quadruplet_ssim/output/",
+                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_STNRFNet64_quadruplet_ssim/output/",
                         dest="out_path")
     parser.add_argument("--model_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_STNResRFNet64v3_quadruplet_ssim/ckpt_epoch_3000.pth",
+                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_STNRFNet64_quadruplet_ssim/ckpt_epoch_2940.pth",
                         dest="model_path")
-    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet64v3")
+    parser.add_argument('--model', type=str, dest='model', default="STNRFNet64")
     parser.add_argument('--loss', type=str, dest='loss', default="SSIM")
     parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
     parser.add_argument("--v_shift", type=int, dest="v_shift", default=2)
     parser.add_argument("--h_shift", type=int, dest="h_shift", default=2)
     parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=2)
     parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-    parser.add_argument("--gpu_num", type=int, dest="gpu_num", default=0)
+    parser.add_argument("--gpu_num", type=int, dest="gpu_num", default=1)
     parser.add_argument("--if_draw", type=bool, dest="if_draw", default=True)
     args = parser.parse_args()
 
-    cls_num = ['01', '02', '04']
+    cls_num = ['01', '02', '04', '07']
+
+    if not os.path.exists(args.out_path):
+        os.mkdir(args.out_path)
 
     inference = model_dict[args.model].cuda(args.gpu_num)
     inference.load_state_dict(torch.load(args.model_path))
@@ -245,7 +250,7 @@ if __name__ == '__main__':
         test_path = os.path.join(args.test_path, c)
         out_path = os.path.join(args.out_path, c + ".mat")
         gscores, iscores, mmat = genuine_imposter_upright(test_path=test_path, image_size=args.default_size,
-                                                          options="RGB", inference=inference, loss_model=Loss)
+                                                          options="RGB", inference=inference, loss_model=Loss, gpu_num= args.gpu_num)
 
         if args.save_mmat:
             io.savemat(out_path, {"g_scores": gscores, "i_scores": iscores, "mmat": mmat})
@@ -254,17 +259,7 @@ if __name__ == '__main__':
 
     if args.if_draw:
         src_mat = []
-        label = ['Left-Little',
-                 'Left-Ring',
-                 'Left-Index',
-                 'Left-Thumb',
-                 'Right-Thumb',
-                 'Right-Index',
-                 'Right-Middle',
-                 'Right-Ring',
-                 'Right-Little',
-                 'Left-Thumb',
-                 ]
+        label = []
         color = ['#000000',
                  "#c0c0c0",
                  '#ff0000',
@@ -278,6 +273,7 @@ if __name__ == '__main__':
                  '#ff00ff',
                  '#ff0000']
         for c in cls_num:
-            src_mat.append(args.out_path, c + ".mat")
+            src_mat.append(os.path.join(args.out_path, c + ".mat"))
+            label.append(c)
 
-        draw_roc(src_mat, color, label, dst=out_path)
+        draw_roc(src_mat, color, label, dst=args.out_path)

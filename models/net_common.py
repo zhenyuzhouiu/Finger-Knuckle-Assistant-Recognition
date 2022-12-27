@@ -85,6 +85,29 @@ class ResBlock(torch.nn.Module):
         return out
 
 
+class ResBlockRelu(torch.nn.Module):
+    """ResidualBlock
+    introduced in: https://arxiv.org/abs/1512.03385
+    recommended architecture: http://torch.ch/blog/2016/02/04/resnets.html
+    """
+
+    def __init__(self, channels):
+        super(ResBlockRelu, self).__init__()
+        self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        self.bn1 = torch.nn.BatchNorm2d(channels)
+        self.conv2 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        self.bn2 = torch.nn.BatchNorm2d(channels)
+        self.relu = torch.nn.ReLU()
+
+    def forward(self, x):
+        residual = x
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out = out + residual
+        out = self.relu(out)
+        return out
+
+
 class SEResidualBlock(torch.nn.Module):
     def __init__(self, channels):
         super(SEResidualBlock, self).__init__()
@@ -206,6 +229,29 @@ class STNResidualBlock(torch.nn.Module):
 
         return out
 
+
+class STNResidualBlockRelu(torch.nn.Module):
+    def __init__(self, channels):
+        super(STNResidualBlockRelu, self).__init__()
+        self.stn = STN(input_channels=channels, input_h=32, input_w=32)
+
+        self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        self.bn1 = torch.nn.BatchNorm2d(channels)
+        self.conv2 = ConvLayer(channels, channels, kernel_size=3, stride=1)
+        self.bn2 = torch.nn.BatchNorm2d(channels)
+        self.relu = torch.nn.ReLU()
+        self.se = SqueezeExcite(channels, channels, 1)
+
+    def forward(self, x):
+        residual = x
+        out = self.stn(x)
+        out = self.relu(self.bn1(self.conv1(out)))
+        out = self.relu(self.bn2(self.conv2(out)))
+        out = self.se(out)
+        out = out + residual
+        out = self.relu(out)
+
+        return out
 
 class DeformResBlock(torch.nn.Module):
     def __init__(self, channels):

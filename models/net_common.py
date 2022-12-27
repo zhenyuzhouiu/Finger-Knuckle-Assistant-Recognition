@@ -227,9 +227,9 @@ class DeformResBlock(torch.nn.Module):
 class DilateResBlock(torch.nn.Module):
     def __init__(self, channels):
         super(DilateResBlock, self).__init__()
-        self.conv1 = torch.nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, dilation=2)
+        self.conv1 = torch.nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=2, dilation=2)
         self.bn1 = torch.nn.BatchNorm2d(num_features=channels)
-        self.conv2 = torch.nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, dilation=2)
+        self.conv2 = torch.nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=2, dilation=2)
         self.bn2 = torch.nn.BatchNorm2d(num_features=channels)
         self.relu = torch.nn.ReLU()
 

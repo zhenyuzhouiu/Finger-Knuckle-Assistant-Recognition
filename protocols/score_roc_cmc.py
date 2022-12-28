@@ -13,6 +13,7 @@ from torch.autograd import Variable
 from protocols.plot.plotroc_basic import *
 from protocols.confusionmatrix.protocol_util import *
 from models.pytorch_mssim import SSIM, RSSSIM
+from models.loss_function import ShiftedLoss
 import matplotlib.pyplot as plt
 import matplotlib
 import tqdm
@@ -32,56 +33,88 @@ model_dict = {
 }
 
 
-def _loss(feats1, feats2, Loss):
+def _loss(feats1, feats2, loss_model):
     # loss = Loss(feats1, mask1, feats2, mask2)
-    loss = Loss(feats1, feats2)
+    loss = loss_model(feats1, feats2)
     if isinstance(loss, torch.autograd.Variable):
         loss = loss.data
     return loss.cpu().numpy()
 
 
-def calc_feats_more(*paths, size=(208, 184), options='RGB', inference, gpu_num):
+def calc_feats_more(*paths, size=(208, 184), options='RGB', model, gpu_num):
     """
     1.Read a batch of images from the given paths
     2.Normalize image from 0-255 to 0-1
     3.Get a batch of feature from the model inference()
     """
-    w, h = size[0], size[1]
-    ratio = size[1] / size[0]
-    container = np.zeros((len(paths), 3, h, w))
-    # mask = np.zeros((len(paths), 1, int(h / 4), int(w / 4)))
-    for i, path in enumerate(paths):
-        image = np.array(
-            Image.open(path).convert(options),
-            dtype=np.float32
-        )
-        image = image[8:-8, :, :]
-        h, w, c = image.shape
-        dest_w = h / ratio
-        dest_h = w * ratio
-        if dest_w > w:
-            crop_h = int((h - dest_h) / 2)
-            if crop_h == 0:
-                crop_h = 1
-            crop_image = image[crop_h - 1:crop_h + int(dest_h), :, :]
-        elif dest_h > h:
-            crop_w = int((w - dest_w) / 2)
-            if crop_w == 0:
-                crop_w = 1
-            crop_image = image[:, crop_w - 1:crop_w + int(dest_w), :]
-        else:
-            crop_image = image
-        resize_image = cv2.resize(crop_image, dsize=size)
-        # change hxwxc = cxhxw
-        im = np.transpose(resize_image, (2, 0, 1))
-        container[i, :, :, :] = im
-        # ma = np.ones([1, int(size[1] / 4), int(size[0] / 4)])
-        # mask[i, :, :, :] = ma
-    container /= 255.
-    container = torch.from_numpy(container.astype(np.float32))
-    container = container.cuda(gpu_num)
-    container = Variable(container, requires_grad=False)
-    fv = inference(container)
+    if options == 'RGB':
+        w, h = size[0], size[1]
+        ratio = size[1] / size[0]
+        container = np.zeros((len(paths), 3, h, w))
+        # mask = np.zeros((len(paths), 1, int(h / 4), int(w / 4)))
+        for i, path in enumerate(paths):
+            image = np.array(
+                Image.open(path).convert(options),
+                dtype=np.float32
+            )
+            image = image[8:-8, :, :]
+            h, w, c = image.shape
+            dest_w = h / ratio
+            dest_h = w * ratio
+            if dest_w > w:
+                crop_h = int((h - dest_h) / 2)
+                if crop_h == 0:
+                    crop_h = 1
+                crop_image = image[crop_h - 1:crop_h + int(dest_h), :, :]
+            elif dest_h > h:
+                crop_w = int((w - dest_w) / 2)
+                if crop_w == 0:
+                    crop_w = 1
+                crop_image = image[:, crop_w - 1:crop_w + int(dest_w), :]
+            else:
+                crop_image = image
+            resize_image = cv2.resize(crop_image, dsize=size)
+            # change hxwxc = cxhxw
+            im = np.transpose(resize_image, (2, 0, 1))
+            container[i, :, :, :] = im
+        container /= 255.
+        container = torch.from_numpy(container.astype(np.float32))
+        container = container.cuda(gpu_num)
+        container = Variable(container, requires_grad=False)
+        fv = model(container)
+    else:
+        w, h = size[0], size[1]
+        ratio = size[1] / size[0]
+        container = np.zeros((len(paths), 1, h, w))
+        # mask = np.zeros((len(paths), 1, int(h / 4), int(w / 4)))
+        for i, path in enumerate(paths):
+            image = np.array(
+                Image.open(path).convert(options),
+                dtype=np.float32
+            )
+            image = image[8:-8, :]
+            h, w = image.shape
+            dest_w = h / ratio
+            dest_h = w * ratio
+            if dest_w > w:
+                crop_h = int((h - dest_h) / 2)
+                if crop_h == 0:
+                    crop_h = 1
+                crop_image = image[crop_h - 1:crop_h + int(dest_h), :]
+            elif dest_h > h:
+                crop_w = int((w - dest_w) / 2)
+                if crop_w == 0:
+                    crop_w = 1
+                crop_image = image[:, crop_w - 1:crop_w + int(dest_w)]
+            else:
+                crop_image = image
+            resize_image = cv2.resize(crop_image, dsize=size)
+            container[i, 0, :, :] = resize_image
+        container /= 255.
+        container = torch.from_numpy(container.astype(np.float32))
+        container = container.cuda(gpu_num)
+        container = Variable(container, requires_grad=False)
+        fv = model(container)
     return fv.cpu().data.numpy()
 
 
@@ -236,6 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, dest='model', default="STNRFNet64")
     parser.add_argument('--loss', type=str, dest='loss', default="SSIM")
     parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
+    parser.add_argument("--option", type=int, dest="option", default='RGB')
     parser.add_argument("--v_shift", type=int, dest="v_shift", default=8)
     parser.add_argument("--h_shift", type=int, dest="h_shift", default=8)
     parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=8)
@@ -256,9 +290,11 @@ if __name__ == '__main__':
 
     if args.loss == "SSIM":
         Loss = SSIM(data_range=1., size_average=False, channel=64)
-    else:
+    elif args.loss == "RSSSIM":
         Loss = RSSSIM(data_range=1., size_average=False, win_size=11, channel=64, v_shift=args.v_shift,
                       h_shift=args.h_shift, angle=args.rotate_angle, step=args.step_size)
+    else:
+        Loss = ShiftedLoss(hshift=args.h_shift, vshift=args.v_shift)
     Loss.cuda(args.gpu_num)
     Loss.eval()
 
@@ -266,7 +302,7 @@ if __name__ == '__main__':
         test_path = os.path.join(args.test_path, c)
         out_path = os.path.join(args.out_path, c + ".mat")
         gscores, iscores, mmat = genuine_imposter_upright(test_path=test_path, image_size=args.default_size,
-                                                          options="RGB", inference=inference, loss_model=Loss, gpu_num= args.gpu_num)
+                                                          options= args.option, inference=inference, loss_model=Loss, gpu_num= args.gpu_num)
 
         if args.save_mmat:
             io.savemat(out_path, {"g_scores": gscores, "i_scores": iscores, "mmat": mmat})

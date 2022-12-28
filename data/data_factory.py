@@ -72,89 +72,7 @@ def load_image(path, options='RGB', size=(208, 184)):
 
         resize_image = cv2.resize(crop_image, dsize=size)
 
-
     return resize_image
-
-
-def load_feature_8(path, image_name):
-    """
-    1). load finger knuckle feature maps from yolov5
-    2). for keeping the same feature map size, we use the roi_align
-
-    return pooled_8.type:-> tensor; pooled_8.shape:-> [1, 320, 32, 32]
-    """
-    image_name = image_name.split('.')[0]
-    # feature_8.shape:-> h*w*320
-    feature_8 = np.load(join(path, image_name + '-8.npy'))
-    h = feature_8.shape[0]
-    w = feature_8.shape[1]
-    # h*w*320 -> 320*h*w -> 1*320*h*w
-    feature_8 = torch.from_numpy(np.expand_dims(np.transpose(feature_8, axes=(2, 0, 1)), axis=0)).float()
-    boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-    # output_size (height, width).
-    pooled_8 = roi_align(feature_8, boxes, [22, 26])
-    pooled_8 = pooled_8.squeeze(0)
-    norm_pooled_8 = pooled_8
-    # for i in range(pooled_8.size(0)):
-    #     pooled_i = pooled_8[i, :, :]
-    #     min = pooled_i.min()
-    #     max = pooled_i.max()
-    #     pooled_i = (pooled_i - min)/(max - min)
-    #     norm_pooled_8[i, :, :] = pooled_i.unsqueeze(0)
-
-    return norm_pooled_8
-
-
-def load_feature_16(path, image_name):
-    """
-    1). load finger knuckle feature maps from yolov5
-    2). for keeping the same feature map size, we use the roi_align
-    """
-    image_name = image_name.split('.')[0]
-    # feature_16.shape:-> h*w*640
-    feature_16 = np.load(join(path, image_name + '-16.npy'))
-    h = feature_16.shape[0]
-    w = feature_16.shape[1]
-    # h*w*640 -> 640*h*w -> 1*640*h*w
-    feature_16 = torch.from_numpy(np.expand_dims(np.transpose(feature_16, axes=(2, 0, 1)), axis=0)).float()
-    boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-    pooled_16 = roi_align(feature_16, boxes, [12, 14])
-    pooled_16 = pooled_16.squeeze(0)
-    norm_pooled_16 = pooled_16
-    # for i in range(pooled_16.size(0)):
-    #     pooled_i = pooled_16[i, :, :]
-    #     min = pooled_i.min()
-    #     max = pooled_i.max()
-    #     pooled_i = (pooled_i - min) / (max - min)
-    #     norm_pooled_16[i, :, :] = pooled_i.unsqueeze(0)
-
-    return norm_pooled_16
-
-
-def load_feature_32(path, image_name):
-    """
-    1). load finger knuckle feature maps from yolov5
-    2). for keeping the same feature map size, we use the roi_align
-    """
-    image_name = image_name.split('.')[0]
-    # feature_32.shape:-> h*w*1280
-    feature_32 = np.load(join(path, image_name + '-32.npy'))
-    h = feature_32.shape[0]
-    w = feature_32.shape[1]
-    # h*w*1280 -> 1280*h*w -> 1*1280*h*w
-    feature_32 = torch.from_numpy(np.expand_dims(np.transpose(feature_32, axes=(2, 0, 1)), axis=0)).float()
-    boxes = torch.tensor([[0, 0, 0, w - 1, h - 1]]).float()
-    pooled_32 = roi_align(feature_32, boxes, [7, 8])
-    pooled_32 = pooled_32.squeeze(0)
-    norm_pooled_32 = pooled_32
-    # for i in range(pooled_32.size(0)):
-    #     pooled_i = pooled_32[i, :, :]
-    #     min = pooled_i.min()
-    #     max = pooled_i.max()
-    #     pooled_i = (pooled_i - min) / (max - min)
-    #     norm_pooled_32[i, :, :] = pooled_i.unsqueeze(0)
-
-    return norm_pooled_32
 
 
 def randpick_list(src, list_except=None):
@@ -178,14 +96,13 @@ def reminderpick_list(src, list_except=None):
 
 
 class Factory(torch.utils.data.Dataset):
-    def __init__(self, img_path, feature_path, input_size,
+    def __init__(self, img_path, input_size,
                  transform=None, valid_ext=['.jpg', '.bmp', '.png'], train=True, n_tuple="triplet",
                  if_aug=False, if_hsv=False, if_rotation=False, if_translation=False, if_scale=False):
         self.ext = valid_ext
         self.transform = transform
         self._has_ext = lambda f: True if [e for e in self.ext if e in f] else False
         self.folder = img_path
-        self.feature_folder = feature_path
         self.train = train
         # input_size:-> (w, h)
         self.input_size = input_size
@@ -242,21 +159,6 @@ class Factory(torch.utils.data.Dataset):
             if self.min_subj > len(inames):
                 self.min_subj = len(inames)
 
-    def _feature_dict_(self):
-        self.feature_fdict = {}
-        self.feature_fnames = []
-        self.min_subj = 1000000
-        for sf in self.subfolder_names:
-            fnames = [d for d in os.listdir(join(self.feature_folder, sf))]
-            if len(fnames) < 1 and self.train:
-                raise RuntimeError('Pls make sure there are at least one feature in {}'.format(
-                    join(self.feature_folder, sf)
-                ))
-            self.feature_fnames = self.feature_fnames + [join(self.feature_folder, sf, f) for f in fnames]
-            self.feature_fdict[sf] = fnames
-            if self.min_subj > len(fnames):
-                self.min_subj = len(fnames)
-
     def _oldtriplet_trainitems(self, index):
         # Per index, per subject
         # Negative samples 5 times than positive
@@ -266,12 +168,17 @@ class Factory(torch.utils.data.Dataset):
         positive = randpick_list(self.fdict[selected_folder], [anchor])
 
         img = []
-        img.append(np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L', size=self.input_size), -1))
-        img.append(np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L', size=self.input_size), -1))
+        img.append(
+            np.expand_dims(load_image(join(self.folder, selected_folder, positive), options='L', size=self.input_size),
+                           -1))
+        img.append(
+            np.expand_dims(load_image(join(self.folder, selected_folder, anchor), options='L', size=self.input_size),
+                           -1))
         for i in range(10):
             negative_folder = randpick_list(self.subfolder_names, [selected_folder])
             negative = randpick_list(self.fdict[negative_folder])
-            img.append(np.expand_dims(load_image(join(self.folder, negative_folder, negative), options='L', size=self.input_size), -1))
+            img.append(np.expand_dims(
+                load_image(join(self.folder, negative_folder, negative), options='L', size=self.input_size), -1))
         img = np.concatenate(img, axis=-1)
         junk = np.array([0])
         if self.transform is not None:

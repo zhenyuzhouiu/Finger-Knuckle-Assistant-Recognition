@@ -4,6 +4,7 @@ import torch
 from tqdm import tqdm
 import torchvision.utils
 from torch.autograd import Variable
+import time
 
 import models.loss_function
 from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64,\
@@ -84,7 +85,7 @@ class Model(object):
             self.writer.add_image(tag="positive", img_tensor=positive_grid)
             negative_grid = torchvision.utils.make_grid(example_negative)
             self.writer.add_image(tag="negative", img_tensor=negative_grid)
-        else:
+        elif args.n_tuple in ['quadruplet']:
             # for showing quadruplet
             examples = iter(train_loader)
             example_data, example_target = examples.next()
@@ -108,7 +109,8 @@ class Model(object):
             self.writer.add_image(tag="negative", img_tensor=negative_grid)
             negative2_grid = torchvision.utils.make_grid(example_negative2)
             self.writer.add_image(tag="negative2", img_tensor=negative2_grid)
-
+        else:
+            print('Skip Summary image show')
         return train_loader, len(train_dataset)
 
     def exp_lr_scheduler(self, epoch, lr_decay=0.1, lr_decay_epoch=100):
@@ -122,11 +124,18 @@ class Model(object):
                               "DilateRFNet64", "DeformRFNet64", "RFNet64Relu", "STNResRFNet64v2Relu"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
-        data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
-        data = Variable(data, requires_grad=False)
-        self.writer.add_graph(inference, [data])
-        inference.cuda()
-        inference.train()
+        if args.model == "RFNet":
+            data = torch.randn([1, 128, 128]).unsqueeze(0).cuda()
+            data = Variable(data, requires_grad=False)
+            self.writer.add_graph(inference, [data])
+            inference.cuda()
+            inference.train()
+        else:
+            data = torch.randn([3, 128, 128]).unsqueeze(0).cuda()
+            data = Variable(data, requires_grad=False)
+            self.writer.add_graph(inference, [data])
+            inference.cuda()
+            inference.train()
 
         if args.loss_type == "rsil":
             loss = RSIL(args.vertical_size, args.horizontal_size, args.rotate_angle).cuda()
@@ -245,9 +254,7 @@ class Model(object):
 
         self.writer.close()
 
-    def masktriplet_train(self, args):
-        epoch_steps = len(self.train_loader)
-        train_loss = 0
+    def _oldtriplet_train(self, args):
         start_epoch = ''.join(x for x in os.path.basename(args.start_ckpt) if x.isdigit())
         if start_epoch:
             start_epoch = int(start_epoch) + 1
@@ -255,104 +262,51 @@ class Model(object):
         else:
             start_epoch = 1
 
-        # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
-        scheduler = MultiStepLR(self.optimizer, milestones=[10, 500, 1000], gamma=0.1)
-        # for freeze spatial transformer network
-        freeze_stn = args.freeze_stn
-
         for e in range(start_epoch, args.epochs + start_epoch):
-            # self.exp_lr_scheduler(e, lr_decay_epoch=100)
+            self.exp_lr_scheduler(e, lr_decay_epoch=200)
             self.inference.train()
             agg_loss = 0.
-            # for batch_id, (x, _) in enumerate(self.train_loader):
-            # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
-            loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
-            for batch_id, (x, mask, _) in loop:
-                if args.model in ["RFNWithSTNet", "STNWithRFNet", "ResidualSTNet"]:
-                    if freeze_stn:
-                        for name, para in self.inference.named_parameters():
-                            if "localization" in name or "fc_loc" in name:
-                                para.requires_grad_(False)
-                    else:
-                        for name, para in self.inference.named_parameters():
-                            if "localization" in name or "fc_loc" in name:
-                                para.requires_grad_(True)
-
-                # ========================================================= train inference model
-                # x.shape :-> [b, 3*3*samples_subject, h, w]
-                # mask.shape :-> [b, 3*samples_subject, h, w]
+            count = 0
+            for batch_id, (x, _) in enumerate(self.train_loader):
+                count += len(x)
+                self.optimizer.zero_grad()
                 x = x.cuda()
+
                 x = Variable(x, requires_grad=False)
-                mask = mask.cuda()
-                mask = Variable(mask, requires_grad=False)
-                fms, mask = self.inference(x.view(-1, 3, x.size(2), x.size(3)),
-                                           mask.view(-1, 1, mask.size(2), mask.size(3)))
-                bs, ch, he, wi = fms.shape
-                # (batch_size, anchor+positive+negative, 32, 32)
+                if "RFN-32" in args.model:
+                    fms = self.inference(x.view(-1, 1, x.size(2), x.size(3)).repeat(1, 3, 1, 1))
+                else:
+                    fms = self.inference(x.view(-1, 1, x.size(2), x.size(3)))
                 fms = fms.view(x.size(0), -1, fms.size(2), fms.size(3))
-                mask = mask.view(x.size(0), -1, mask.size(2), mask.size(3))
 
-                anchor_fm = fms[:, 0:ch, :, :]  # anchor has one sample
-                if len(anchor_fm.shape) == 3:
-                    anchor_fm.unsqueeze(1)
-                anchor_mask = mask[:, 1, :, :].unsqueeze(1)
-                pos_fm = fms[:, 1 * ch:self.samples_subject * ch, :, :].contiguous()
-                pos_mask = mask[:, 1:self.samples_subject, :, :].contiguous()
-                neg_fm = fms[:, self.samples_subject * ch:, :, :].contiguous()
-                neg_mask = mask[:, self.samples_subject:, :, :].contiguous()
-                nneg = int(neg_fm.size(1) / ch)
-                neg_fm = neg_fm.view(-1, ch, neg_fm.size(2), neg_fm.size(3))
-                neg_mask = neg_mask.view(-1, 1, neg_mask.size(2), neg_fm.size(3))
-                an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
-                                    anchor_mask.repeat(1, nneg, 1, 1).view(-1, 1, anchor_mask.size(2),
-                                                                           anchor_mask.size(3)),
-                                    neg_fm,
-                                    neg_mask)
-                # an_loss.shape:-> (batch_size, 10)
-                # min(1) will get min value and the corresponding indices
-                # min(1)[0]
+                anchor_fm = fms[:, 0, :, :].unsqueeze(1)
+                pos_fm = fms[:, 1, :, :].unsqueeze(1)
+                neg_fm = fms[:, 2:, :, :].contiguous()
+
+                nneg = neg_fm.size(1)
+                neg_fm = neg_fm.view(-1, 1, neg_fm.size(2), neg_fm.size(3))
+                an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
+                                    neg_fm)
                 an_loss = an_loss.view((-1, nneg)).min(1)[0]
-
-                npos = int(pos_fm.size(1) / ch)
-                pos_fm = pos_fm.view(-1, ch, pos_fm.size(2), pos_fm.size(3))
-                pos_mask = pos_mask.view(-1, 1, pos_mask.size(2), pos_mask.size(3))
-                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, ch, anchor_fm.size(2), anchor_fm.size(3)),
-                                    anchor_mask.repeat(1, npos, 1, 1).view(-1, 1, anchor_mask.size(2),
-                                                                           anchor_mask.size(3)),
-                                    pos_fm,
-                                    pos_mask)
-                ap_loss = ap_loss.view((-1, npos)).max(1)[0]
+                ap_loss = self.loss(anchor_fm, pos_fm)
 
                 sstl = ap_loss - an_loss + args.alpha
                 sstl = torch.clamp(sstl, min=0)
-
                 loss = torch.sum(sstl) / args.batch_size
 
                 loss.backward()
                 self.optimizer.step()
-                self.optimizer.zero_grad()
+
                 agg_loss += loss.item()
-                train_loss += loss.item()
 
-                loop.set_description(f'Epoch [{e}/{args.epochs}]')
-                loop.set_postfix(loss_inference="{:.6f}".format(agg_loss))
-
-            self.writer.add_scalar("lr", scalar_value=self.optimizer.state_dict()['param_groups'][0]['lr'],
-                                   global_step=(e + 1))
-            self.writer.add_scalar("loss_inference", scalar_value=train_loss,
-                                   global_step=((e + 1) * epoch_steps))
-
-            if agg_loss <= args.freeze_thre:
-                freeze_stn = False
-
-            train_loss = 0
+                if e % args.log_interval == 0:
+                    mesg = "{}\tEpoch {}:\t[{}/{}]\t {:.6f}".format(
+                        time.ctime(), e, count, self.dataset_size, agg_loss / (batch_id + 1)
+                    )
+                    print(mesg)
 
             if args.checkpoint_dir is not None and e % args.checkpoint_interval == 0:
                 self.save(args.checkpoint_dir, e)
-
-            scheduler.step()
-
-        self.writer.close()
 
     def quadruplet_loss(self, args):
         epoch_steps = len(self.train_loader)
@@ -438,178 +392,7 @@ class Model(object):
 
         self.writer.close()
 
-    def assistant_triplet_train(self, args):
-        epoch_steps = len(self.train_loader)
-        train_loss = 0
-        start_epoch = ''.join(x for x in os.path.basename(args.start_ckpt) if x.isdigit())
-        if start_epoch:
-            start_epoch = int(start_epoch) + 1
-            self.load(args.start_ckpt)
-        else:
-            start_epoch = 1
-
-        # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
-        scheduler = MultiStepLR(self.optimizer, milestones=[10, 1000, 1500], gamma=0.1)
-
-        for e in range(start_epoch, args.epochs + start_epoch):
-            # self.exp_lr_scheduler(e, lr_decay_epoch=100)
-            self.inference.train()
-            agg_loss = 0.
-            loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
-            for batch_id, (x, _, assistant_f8, assistant_f16, assistant_f32) in loop:
-                # ============================================================== train assistant model
-                # assistant_f8.shape :-> [b, 320*3*samples_subject, 32, 32]
-                assistant_f8 = assistant_f8.cuda()
-                assistant_f8 = Variable(assistant_f8, requires_grad=False)
-                assistant_f16 = assistant_f16.cuda()
-                assistant_f16 = Variable(assistant_f16, requires_grad=False)
-                assistant_f32 = assistant_f32.cuda()
-                assistant_f32 = Variable(assistant_f32, requires_grad=False)
-
-                fms_assistant = self.inference(assistant_f8.view(-1, 320, assistant_f8.size(2), assistant_f8.size(3)),
-                                               assistant_f16.view(-1, 640, assistant_f16.size(2),
-                                                                  assistant_f16.size(3)),
-                                               assistant_f32.view(-1, 1280, assistant_f32.size(2),
-                                                                  assistant_f32.size(3)))
-
-                # (batch_size, 12, 32, 32)
-                fms_assistant = fms_assistant.view(assistant_f8.size(0), -1, fms_assistant.size(2),
-                                                   fms_assistant.size(3))
-
-                anchor_fm = fms_assistant[:, 0, :, :].unsqueeze(1)
-                pos_fm = fms_assistant[:, 1:self.samples_subject, :, :].contiguous()
-                neg_fm = fms_assistant[:, self.samples_subject:, :, :].contiguous()
-
-                nneg = neg_fm.size(1)
-                neg_fm = neg_fm.view(-1, 1, neg_fm.size(2), neg_fm.size(3))
-                an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
-                                    neg_fm)
-                an_loss = an_loss.view((-1, nneg)).min(1)[0]
-
-                npos = pos_fm.size(1)
-                pos_fm = pos_fm.view(-1, 1, pos_fm.size(2), pos_fm.size(3))
-                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
-                                    pos_fm)
-                ap_loss = ap_loss.view((-1, npos)).max(1)[0]
-
-                sstl = ap_loss - an_loss + args.alpha
-                sstl = torch.clamp(sstl, min=0)
-
-                loss = torch.sum(sstl) / args.batch_size
-                loss.backward()
-                self.optimizer.step()
-                self.optimizer.zero_grad()
-                agg_loss += loss.item()
-                train_loss += loss.item()
-                loop.set_description(f'Epoch [{e}/{args.epochs}]')
-                loop.set_postfix(loss_inference="{:.6f}".format(agg_loss))
-
-            self.writer.add_scalar("lr", scalar_value=self.optimizer.state_dict()['param_groups'][0]['lr'],
-                                   global_step=(e + 1))
-            self.writer.add_scalar("loss_inference", scalar_value=train_loss,
-                                   global_step=((e + 1) * epoch_steps))
-
-            train_loss = 0
-
-            if args.checkpoint_dir is not None and e % args.checkpoint_interval == 0:
-                self.save(args.checkpoint_dir, e)
-
-            scheduler.step()
-
-        self.writer.close()
-
-    def fusion_triplet_train(self, args):
-        epoch_steps = len(self.train_loader)
-        train_loss = 0
-        start_epoch = ''.join(x for x in os.path.basename(args.start_ckpt) if x.isdigit())
-        if start_epoch:
-            start_epoch = int(start_epoch) + 1
-            self.load(args.start_ckpt)
-        else:
-            start_epoch = 1
-
-        # 0-100: 0.01; 150-450: 0.001; 450-800:0.0001; 800-：0.00001
-        scheduler = MultiStepLR(self.optimizer, milestones=[10, 500, 1000], gamma=0.1)
-
-        for e in range(start_epoch, args.epochs + start_epoch):
-            # self.exp_lr_scheduler(e, lr_decay_epoch=100)
-            self.inference.train()
-            agg_loss = 0.
-            # for batch_id, (x, _) in enumerate(self.train_loader):
-            # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
-            loop = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
-            for batch_id, (x, _, assistant_f8, assistant_f16, assistant_f32) in loop:
-                # ======================================================== train inference model
-                # x.shape :-> [b, 3*3*samples_subject, h, w]
-                # y.shape:
-                x = x.cuda()
-                x = Variable(x, requires_grad=False)
-                assistant_f8 = assistant_f8.cuda()
-                assistant_f8 = Variable(assistant_f8, requires_grad=False)
-                assistant_f16 = assistant_f16.cuda()
-                assistant_f16 = Variable(assistant_f16, requires_grad=False)
-                assistant_f32 = assistant_f32.cuda()
-                assistant_f32 = Variable(assistant_f32, requires_grad=False)
-
-                # def forward(self, x, s8, s16, s32):
-                fms = self.inference(x.view(-1, 3, x.size(2), x.size(3)),
-                                     assistant_f8.view(-1, 320, assistant_f8.size(2), assistant_f8.size(3)),
-                                     assistant_f16.view(-1, 640, assistant_f16.size(2), assistant_f16.size(3)),
-                                     assistant_f32.view(-1, 1280, assistant_f32.size(2), assistant_f32.size(3)))
-                # (batch_size, anchor+positive+negative, 32, 32)
-                fms = fms.view(x.size(0), -1, fms.size(2), fms.size(3))
-
-                anchor_fm = fms[:, 0, :, :].unsqueeze(1)  # anchor has one sample
-                pos_fm = fms[:, 1:self.samples_subject, :, :].contiguous()
-                neg_fm = fms[:, self.samples_subject:, :, :].contiguous()
-                nneg = neg_fm.size(1)
-                neg_fm = neg_fm.view(-1, 1, neg_fm.size(2), neg_fm.size(3))
-                an_loss = self.loss(anchor_fm.repeat(1, nneg, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
-                                    neg_fm)
-                an_loss = an_loss.view((-1, nneg)).min(1)[0]
-
-                npos = pos_fm.size(1)
-                pos_fm = pos_fm.view(-1, 1, pos_fm.size(2), pos_fm.size(3))
-                ap_loss = self.loss(anchor_fm.repeat(1, npos, 1, 1).view(-1, 1, anchor_fm.size(2), anchor_fm.size(3)),
-                                    pos_fm)
-                ap_loss = ap_loss.view((-1, npos)).max(1)[0]
-
-                sstl = ap_loss - an_loss + args.alpha
-                sstl = torch.clamp(sstl, min=0)
-
-                loss = torch.sum(sstl) / args.batch_size
-
-                loss.backward()
-                self.optimizer.step()
-                self.optimizer.zero_grad()
-                agg_loss += loss.item()
-                train_loss += loss.item()
-
-                loop.set_description(f'Epoch [{e}/{args.epochs}]')
-                loop.set_postfix(loss_inference="{:.6f}".format(agg_loss))
-
-            self.writer.add_scalar("lr", scalar_value=self.optimizer.state_dict()['param_groups'][0]['lr'],
-                                   global_step=(e + 1))
-            self.writer.add_scalar("loss_inference", scalar_value=train_loss,
-                                   global_step=((e + 1) * epoch_steps))
-
-            train_loss = 0
-
-            if args.checkpoint_dir is not None and e % args.checkpoint_interval == 0:
-                self.save(args.checkpoint_dir, e)
-
-            scheduler.step()
-
-        self.writer.close()
-
     def save(self, checkpoint_dir, e):
-        if self.args.loss_type == "ssimgnn":
-            self.loss.eval()
-            self.loss.cpu()
-            ckpt_model_filename = os.path.join(checkpoint_dir, "loss_ckpt_epoch_" + str(e) + ".pth")
-            torch.save(self.loss.state_dict(), ckpt_model_filename)
-            self.loss.cuda()
-            self.loss.train()
         self.inference.eval()
         self.inference.cpu()
         ckpt_model_filename = os.path.join(checkpoint_dir, "ckpt_epoch_" + str(e) + ".pth")
@@ -618,9 +401,5 @@ class Model(object):
         self.inference.train()
 
     def load(self, checkpoint_dir):
-        if self.args.loss_type == "ssimgnn":
-            self.loss.load_state_dict(torch.load(self.args.sglue_conf["weight"]))
-            self.loss.cuda()
-            self.loss.train()
         self.inference.load_state_dict(torch.load(checkpoint_dir))
         self.inference.cuda()

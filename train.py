@@ -5,7 +5,7 @@
 import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import argparse
 import shutil
@@ -34,10 +34,10 @@ def build_parser():
     parser.add_argument('--samples_subject', type=int, dest='samples_subject',
                         default=5)
     parser.add_argument('--n_tuple', type=str, dest='n_tuple',
-                        default='quadruplet', help="how to select the input tuple, triplet, quadruplet, feature")
+                        default='oldtriplet', help="how to select the input tuple, triplet, quadruplet, oldtriplet")
     # Model
-    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet64v2")
-    parser.add_argument('--loss_type', type=str, dest="loss_type", default="rsssim")
+    parser.add_argument('--model', type=str, dest='model', default="RFNet")
+    parser.add_argument('--loss_type', type=str, dest="loss_type", default="shiftedloss")
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
     parser.add_argument('--if_hsv', type=bool, dest="if_hsv", default=False)
     parser.add_argument('--if_rotation', type=bool, dest="if_rotation", default=False)
@@ -45,7 +45,7 @@ def build_parser():
     parser.add_argument('--if_scale', type=bool, dest="if_scale", default=False)
 
     # Training StrategyResidualSTNet
-    parser.add_argument('--batch_size', type=int, dest='batch_size', default=1)
+    parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
     parser.add_argument('--learning_rate1', type=float, dest='learning_rate1', default=1e-3)
     parser.add_argument('--learning_rate2', type=float, dest='learning_rate2', default=1e-2)
@@ -53,11 +53,11 @@ def build_parser():
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
     # Pre-defined Options
-    parser.add_argument('--alpha', type=float, dest='alpha', default=0.6)
+    parser.add_argument('--alpha', type=float, dest='alpha', default=10)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=0.3, help="the second margin of quadruplet loss")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
-    parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=8)
-    parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=8)
+    parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=5)
+    parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=5)
     parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=8)
     parser.add_argument('--step_size', type=int, dest="step_size", default=2)
     parser.add_argument('--freeze_stn', type=bool, dest="freeze_stn", default=True)
@@ -110,9 +110,8 @@ def main():
         model_.quadruplet_train()
     else:
         model_ = Model(args, writer=writer)
-        if args.n_tuple == "feature":
-            model_.fusion_triplet_train(args)
-            # model_.assistant_triplet_train(args)
+        if args.n_tuple == "oldtriplet":
+            model_._oldtriplet_train(args)
         elif args.n_tuple == "quadruplet":
             model_.quadruplet_loss(args)
         else:

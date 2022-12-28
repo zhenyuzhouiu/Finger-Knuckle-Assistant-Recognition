@@ -159,7 +159,7 @@ class Model(object):
                 else:
                     raise RuntimeError('Please make sure your loss function!')
         loss.cuda()
-        loss.eval()
+        loss.train()
         return inference, loss
 
     def _triplet_train(self, args):
@@ -409,6 +409,7 @@ class Model(object):
         for e in range(start_epoch, args.epochs + start_epoch):
             # self.exp_lr_scheduler(e, lr_decay_epoch=100)
             self.inference.train()
+            self.loss.train()
             agg_loss = 0.
             # for batch_id, (x, _) in enumerate(self.train_loader):
             # for batch_id, (x, _) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):

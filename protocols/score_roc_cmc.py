@@ -258,7 +258,7 @@ if __name__ == '__main__':
         Loss = SSIM(data_range=1., size_average=False, channel=64)
     else:
         Loss = RSSSIM(data_range=1., size_average=False, win_size=11, channel=64, v_shift=args.v_shift,
-                      h_shift=args.h_shift, angle=args.rotate_angle)
+                      h_shift=args.h_shift, angle=args.rotate_angle, step=args.step_size)
     Loss.cuda(args.gpu_num)
     Loss.eval()
 

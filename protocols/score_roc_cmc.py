@@ -5,6 +5,8 @@ import scipy.io as io
 import torch
 import cv2
 import argparse
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
     STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, DilateRFNet64, RFNet64Relu, STNResRFNet64v2Relu
 from torch.autograd import Variable
@@ -234,9 +236,10 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, dest='model', default="STNRFNet64")
     parser.add_argument('--loss', type=str, dest='loss', default="SSIM")
     parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
-    parser.add_argument("--v_shift", type=int, dest="v_shift", default=2)
-    parser.add_argument("--h_shift", type=int, dest="h_shift", default=2)
-    parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=2)
+    parser.add_argument("--v_shift", type=int, dest="v_shift", default=8)
+    parser.add_argument("--h_shift", type=int, dest="h_shift", default=8)
+    parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=8)
+    parser.add_argument("--step_size", type=int, dest="step_size", default=4)
     parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
     parser.add_argument("--gpu_num", type=int, dest="gpu_num", default=1)
     parser.add_argument("--if_draw", type=bool, dest="if_draw", default=True)

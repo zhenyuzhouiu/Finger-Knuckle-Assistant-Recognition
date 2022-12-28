@@ -187,6 +187,50 @@ class STNResRFNet64v3(torch.nn.Module):
         return conv4
 
 
+class STNResRFNet64v4(torch.nn.Module):
+    def __init__(self):
+        super(STNResRFNet64v4, self).__init__()
+        # Initial convolution layers
+        self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
+        self.conv2 = ConvLayer(32, 64, kernel_size=3, stride=2)
+        self.conv3 = ConvLayer(64, 128, kernel_size=3, stride=1)
+        self.resid1 = ResidualBlock(128)
+        self.stnres1 = STNResidualBlock(128)
+        self.conv4 = ConvLayer(128, 64, kernel_size=3, stride=1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        conv1 = F.relu(self.conv1(x))
+        conv2 = F.relu(self.conv2(conv1))
+        conv3 = F.relu(self.conv3(conv2))
+        resid1 = self.resid1(conv3)
+        stnres1 = self.stnres1(resid1)
+        conv4 = self.sigmoid(self.conv4(stnres1))
+        return conv4
+
+
+class STNResRFNet64v5(torch.nn.Module):
+    def __init__(self):
+        super(STNResRFNet64v5, self).__init__()
+        # Initial convolution layers
+        self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
+        self.conv2 = ConvLayer(32, 64, kernel_size=3, stride=2)
+        self.conv3 = ConvLayer(64, 128, kernel_size=3, stride=1)
+        self.stnres1 = STNResidualBlock(128)
+        self.conv4 = ConvLayer(128, 64, kernel_size=3, stride=1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        conv1 = F.relu(self.conv1(x))
+        conv2 = F.relu(self.conv2(conv1))
+        conv3 = F.relu(self.conv3(conv2))
+        stnres1 = self.stnres1(conv3)
+        conv4 = self.sigmoid(self.conv4(stnres1))
+        return conv4
+
+
 class RFNet64(torch.nn.Module):
     def __init__(self):
         super(RFNet64, self).__init__()

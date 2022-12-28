@@ -7,8 +7,9 @@ from torch.autograd import Variable
 import time
 
 import models.loss_function
-from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64,\
-    STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, DilateRFNet64, RFNet64Relu, STNResRFNet64v2Relu
+from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
+    STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, DilateRFNet64, \
+    RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet64v4, STNResRFNet64v5
 from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM
 from torchvision import transforms
@@ -42,6 +43,8 @@ model_dict = {
     "DeformRFNet64": DeformRFNet64().cuda(),
     "RFNet64Relu": RFNet64Relu().cuda(),
     "STNResRFNet64v2Relu": STNResRFNet64v2Relu().cuda(),
+    "STNResRFNet64v4": STNResRFNet64v4().cuda(),
+    "STNResRFNet64v5": STNResRFNet64v5().cuda()
 }
 
 
@@ -121,7 +124,8 @@ class Model(object):
     def _build_model(self, args):
         if args.model not in ["RFNet", "FKEfficientNet", "RFNet64", "RFNet64_16", "SERFNet64",
                               "STNRFNet64", "STNResRFNet64", "STNResRFNet64v2", "STNResRFNet64v3",
-                              "DilateRFNet64", "DeformRFNet64", "RFNet64Relu", "STNResRFNet64v2Relu"]:
+                              "DilateRFNet64", "DeformRFNet64", "RFNet64Relu", "STNResRFNet64v2Relu",
+                              "STNResRFNet64v4", "STNResRFNet64v5"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         if args.model == "RFNet":

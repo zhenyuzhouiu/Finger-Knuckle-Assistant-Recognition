@@ -5,7 +5,7 @@
 import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import argparse
 import shutil
@@ -26,14 +26,14 @@ def build_parser():
 
     # Dataset Options
     parser.add_argument('--train_path', type=str, dest='train_path',
-                        default=r'F:\mask-seg\mask-seg\03')
+                        default='/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/03/')
     parser.add_argument('--samples_subject', type=int, dest='samples_subject',
                         default=5)
     parser.add_argument('--n_tuple', type=str, dest='n_tuple',
                         default='quadruplet', help="how to select the input tuple, triplet, quadruplet, oldtriplet")
     # Model
-    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet64v2")
-    parser.add_argument('--loss_type', type=str, dest="loss_type", default="stssim")
+    parser.add_argument('--model', type=str, dest='model', default="DilateRFNet64")
+    parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssim")
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
     parser.add_argument('--if_hsv', type=bool, dest="if_hsv", default=False)
     parser.add_argument('--if_rotation', type=bool, dest="if_rotation", default=False)
@@ -44,7 +44,7 @@ def build_parser():
     parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
     parser.add_argument('--learning_rate1', type=float, dest='learning_rate1', default=1e-3)
-    parser.add_argument('--learning_rate2', type=float, dest='learning_rate2', default=1e-2)
+    parser.add_argument('--learning_rate2', type=float, dest='learning_rate2', default=1e-3)
 
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)

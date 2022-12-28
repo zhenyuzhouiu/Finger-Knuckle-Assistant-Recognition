@@ -13,6 +13,7 @@ from torch.autograd import Variable
 from protocols.plot.plotroc_basic import *
 from protocols.confusionmatrix.protocol_util import *
 from models.pytorch_mssim import SSIM, RSSSIM
+from loss.stn_ssim import STSSIM
 from models.loss_function import ShiftedLoss
 import matplotlib.pyplot as plt
 import matplotlib
@@ -41,7 +42,7 @@ def _loss(feats1, feats2, loss_model):
     return loss.cpu().numpy()
 
 
-def calc_feats_more(*paths, size=(208, 184), options='RGB', model, gpu_num):
+def calc_feats_more(*paths, size=(128, 128), options='RGB', model, gpu_num):
     """
     1.Read a batch of images from the given paths
     2.Normalize image from 0-255 to 0-1
@@ -261,15 +262,18 @@ if __name__ == '__main__':
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
     parser.add_argument("--out_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_STNRFNet64_quadruplet_ssim/output/",
+                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_DilateRFNet64_quadruplet_ssim_12-27-10-15-58/output/",
                         dest="out_path")
     parser.add_argument("--model_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_STNRFNet64_quadruplet_ssim/ckpt_epoch_2940.pth",
+                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_DilateRFNet64_quadruplet_ssim_12-27-10-15-58/ckpt_epoch_3000.pth",
                         dest="model_path")
-    parser.add_argument('--model', type=str, dest='model', default="STNRFNet64")
+    parser.add_argument("--loss_path", type=str,
+                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_DilateRFNet64_quadruplet_ssim_12-27-10-15-58/loss_epoch_3000.pth",
+                        dest="loss_path")
+    parser.add_argument('--model', type=str, dest='model', default="DilateRFNet64")
     parser.add_argument('--loss', type=str, dest='loss', default="SSIM")
     parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
-    parser.add_argument("--option", type=int, dest="option", default='RGB')
+    parser.add_argument("--option", type=str, dest="option", default='RGB')
     parser.add_argument("--v_shift", type=int, dest="v_shift", default=8)
     parser.add_argument("--h_shift", type=int, dest="h_shift", default=8)
     parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=8)
@@ -294,8 +298,13 @@ if __name__ == '__main__':
         Loss = RSSSIM(data_range=1., size_average=False, win_size=11, channel=64, v_shift=args.v_shift,
                       h_shift=args.h_shift, angle=args.rotate_angle, step=args.step_size)
     else:
-        Loss = ShiftedLoss(hshift=args.h_shift, vshift=args.v_shift)
+        if args.loss == "STSSIM":
+            Loss = STSSIM(data_range=1., size_average=False, channel=64)
+        else:
+            Loss = ShiftedLoss(hshift=args.h_shift, vshift=args.v_shift)
     Loss.cuda(args.gpu_num)
+    if args.loss == "STSSIM":
+        Loss.load_state_dict(torch.load(args.loss_path))
     Loss.eval()
 
     for c in cls_num:

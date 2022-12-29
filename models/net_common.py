@@ -190,7 +190,7 @@ class STN(torch.nn.Module):
 
 
 class STNResidualBlock(torch.nn.Module):
-    def __init__(self, channels):
+    def __init__(self, channels, height=32, width=32):
         super(STNResidualBlock, self).__init__()
         # self.stn = STN(input_channels=channels, input_h=32, input_w=32)
         #
@@ -201,8 +201,9 @@ class STNResidualBlock(torch.nn.Module):
         # self.relu = torch.nn.ReLU()
         # self.se = SqueezeExcite(int(channels * 2), int(channels * 2), 1)
         # self.conv3 = torch.nn.Conv2d(int(channels * 2), channels, kernel_size=1, stride=1)
-
-        self.stn = STN(input_channels=channels, input_h=32, input_w=32)
+        self.height = height
+        self.width = width
+        self.stn = STN(input_channels=channels, input_h=height, input_w=width)
 
         self.conv1 = ConvLayer(channels, channels, kernel_size=3, stride=1)
         self.bn1 = torch.nn.BatchNorm2d(channels)
@@ -252,6 +253,7 @@ class STNResidualBlockRelu(torch.nn.Module):
         out = self.relu(out)
 
         return out
+
 
 class DeformResBlock(torch.nn.Module):
     def __init__(self, channels):

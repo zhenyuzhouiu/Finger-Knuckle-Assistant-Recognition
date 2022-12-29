@@ -32,7 +32,7 @@ def build_parser():
     parser.add_argument('--n_tuple', type=str, dest='n_tuple',
                         default='quadruplet', help="how to select the input tuple, triplet, quadruplet, oldtriplet")
     # Model
-    parser.add_argument('--model', type=str, dest='model', default="DilateRFNet64")
+    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet3v316")
     parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssim")
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
     parser.add_argument('--if_hsv', type=bool, dest="if_hsv", default=False)
@@ -52,10 +52,10 @@ def build_parser():
     parser.add_argument('--alpha', type=float, dest='alpha', default=0.6)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=0.3, help="the second margin of quadruplet loss")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
-    parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=5)
-    parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=5)
-    parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=8)
-    parser.add_argument('--step_size', type=int, dest="step_size", default=2)
+    parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=4)
+    parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=4)
+    parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=4)
+    parser.add_argument('--step_size', type=int, dest="step_size", default=1)
     parser.add_argument('--freeze_stn', type=bool, dest="freeze_stn", default=True)
     parser.add_argument('--freeze_thre', type=float, dest="freeze_thre", default=0)
     parser.add_argument('--sglue_conf', type=dict, dest="sglue_conf", default={

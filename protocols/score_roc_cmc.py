@@ -8,7 +8,8 @@ import argparse
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
-    STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, DilateRFNet64, RFNet64Relu, STNResRFNet64v2Relu
+    STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, \
+    DilateRFNet64, RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet32v216, STNResRFNet32v316, STNResRFNet3v316
 from torch.autograd import Variable
 from protocols.plot.plotroc_basic import *
 from protocols.confusionmatrix.protocol_util import *
@@ -30,7 +31,10 @@ model_dict = {
     "DeformRFNet64": DeformRFNet64(),
     "DilateRFNet64": DilateRFNet64(),
     "RFNet64Relu": RFNet64Relu(),
-    "STNResRFNet64v2Relu": STNResRFNet64v2Relu()
+    "STNResRFNet64v2Relu": STNResRFNet64v2Relu(),
+    "STNResRFNet32v216": STNResRFNet32v216(),
+    "STNResRFNet32v316": STNResRFNet32v316(),
+    "STNResRFNet3v316": STNResRFNet3v316()
 }
 
 
@@ -130,7 +134,7 @@ def genuine_imposter_upright(test_path, image_size, options, inference, loss_mod
         subims.sort()
         nfeats += len(subims)
         feats_length.append(len(subims))
-        fm = calc_feats_more(*subims, size=image_size, options=options, inference=inference, gpu_num=gpu_num)
+        fm = calc_feats_more(*subims, size=image_size, options=options, model=inference, gpu_num=gpu_num)
         feats_all.append(fm)
     feats_length = np.array(feats_length)
     acc_len = np.cumsum(feats_length)
@@ -151,16 +155,16 @@ def genuine_imposter_upright(test_path, image_size, options, inference, loss_mod
             for nc in range(num_chuncks):
                 x_nc = x[0 + nc * chuncks:chuncks + nc * chuncks, :, :, :]
                 y_nc = y[0 + nc * chuncks:chuncks + nc * chuncks, :, :, :]
-                loss[0 + nc * chuncks:chuncks + nc * chuncks] = _loss(x_nc, y_nc, Loss=loss_model)
+                loss[0 + nc * chuncks:chuncks + nc * chuncks] = _loss(x_nc, y_nc, loss_model=loss_model)
             if num_reminder > 0:
                 x_nc = x[chuncks + nc * chuncks:, :, :, :]
                 y_nc = y[chuncks + nc * chuncks:, :, :, :]
                 if x_nc.ndim == 3:
                     x_nc = x_nc.unsqueeze(0)
                     y_nc = y_nc.unsqueeze(0)
-                loss[chuncks + nc * chuncks:] = _loss(x_nc, y_nc, Loss=loss_model)
+                loss[chuncks + nc * chuncks:] = _loss(x_nc, y_nc, loss_model=loss_model)
         else:
-            loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :], Loss=loss_model)
+            loss = _loss(feats_all[:-i, :, :, :], feats_all[i:, :, :, :], loss_model=loss_model)
         matching_matrix[:-i, i] = loss
 
     matt = np.ones_like(matching_matrix) * 1e5
@@ -262,15 +266,15 @@ if __name__ == '__main__':
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
     parser.add_argument("--out_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_DilateRFNet64_quadruplet_ssim_12-27-10-15-58/output/",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet32v316_quadruplet_ssim_12-29-11-06-39/output/",
                         dest="out_path")
     parser.add_argument("--model_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_DilateRFNet64_quadruplet_ssim_12-27-10-15-58/ckpt_epoch_3000.pth",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet32v316_quadruplet_ssim_12-29-11-06-39/ckpt_epoch_3000.pth",
                         dest="model_path")
     parser.add_argument("--loss_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/Spatial-Transformer-Network/MaskLM_DilateRFNet64_quadruplet_ssim_12-27-10-15-58/loss_epoch_3000.pth",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet64v2_quadruplet_stssim_12-28-16-20-06/loss_epoch_3000.pth",
                         dest="loss_path")
-    parser.add_argument('--model', type=str, dest='model', default="DilateRFNet64")
+    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet32v316")
     parser.add_argument('--loss', type=str, dest='loss', default="SSIM")
     parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
     parser.add_argument("--option", type=str, dest="option", default='RGB')
@@ -293,7 +297,7 @@ if __name__ == '__main__':
     inference.eval()
 
     if args.loss == "SSIM":
-        Loss = SSIM(data_range=1., size_average=False, channel=64)
+        Loss = SSIM(data_range=1., size_average=False, win_size=7, channel=32)
     elif args.loss == "RSSSIM":
         Loss = RSSSIM(data_range=1., size_average=False, win_size=11, channel=64, v_shift=args.v_shift,
                       h_shift=args.h_shift, angle=args.rotate_angle, step=args.step_size)

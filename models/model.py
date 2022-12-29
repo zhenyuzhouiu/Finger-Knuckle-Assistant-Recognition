@@ -9,7 +9,7 @@ import time
 import models.loss_function
 from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
     STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, DilateRFNet64, \
-    RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet64v4, STNResRFNet64v5
+    RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet64v4, STNResRFNet64v5, STNResRFNet32v216, STNResRFNet32v316, STNResRFNet3v316
 from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM
 from torchvision import transforms
@@ -44,7 +44,10 @@ model_dict = {
     "RFNet64Relu": RFNet64Relu().cuda(),
     "STNResRFNet64v2Relu": STNResRFNet64v2Relu().cuda(),
     "STNResRFNet64v4": STNResRFNet64v4().cuda(),
-    "STNResRFNet64v5": STNResRFNet64v5().cuda()
+    "STNResRFNet64v5": STNResRFNet64v5().cuda(),
+    "STNResRFNet32v216": STNResRFNet32v216().cuda(),
+    "STNResRFNet32v316": STNResRFNet32v316().cuda(),
+    "STNResRFNet3v316": STNResRFNet3v316().cuda()
 }
 
 
@@ -125,7 +128,8 @@ class Model(object):
         if args.model not in ["RFNet", "FKEfficientNet", "RFNet64", "RFNet64_16", "SERFNet64",
                               "STNRFNet64", "STNResRFNet64", "STNResRFNet64v2", "STNResRFNet64v3",
                               "DilateRFNet64", "DeformRFNet64", "RFNet64Relu", "STNResRFNet64v2Relu",
-                              "STNResRFNet64v4", "STNResRFNet64v5"]:
+                              "STNResRFNet64v4", "STNResRFNet64v5", "STNResRFNet32v216", "STNResRFNet32v316",
+                              "STNResRFNet3v316"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         if args.model == "RFNet":
@@ -150,14 +154,14 @@ class Model(object):
             logging("Successfully building shiftedloss loss")
         else:
             if args.loss_type == "ssim":
-                loss = SSIM(data_range=1., size_average=False, channel=64).cuda()
+                loss = SSIM(data_range=1., size_average=False, channel=3, win_size=7).cuda()
                 logging("Successfully building ssim triplet loss")
             elif args.loss_type == "stssim":
                 loss = STSSIM(data_range=1., size_average=False, channel=64).cuda()
                 logging("Successfully building stssim loss")
             else:
                 if args.loss_type == "rsssim":
-                    loss = RSSSIM(data_range=1., size_average=False, channel=64, v_shift=args.vertical_size,
+                    loss = RSSSIM(data_range=1., size_average=False, channel=32, win_size=7, v_shift=args.vertical_size,
                                   h_shift=args.horizontal_size, angle=args.rotate_angle, step=args.step_size).cuda()
                     logging("Successfully building rsssim loss")
                 else:

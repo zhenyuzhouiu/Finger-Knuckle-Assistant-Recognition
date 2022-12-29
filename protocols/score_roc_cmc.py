@@ -266,15 +266,15 @@ if __name__ == '__main__':
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
     parser.add_argument("--out_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet32v316_quadruplet_ssim_12-29-11-06-39/output/",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v316_quadruplet_ssim_12-29-15-57-50/output/",
                         dest="out_path")
     parser.add_argument("--model_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet32v316_quadruplet_ssim_12-29-11-06-39/ckpt_epoch_3000.pth",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v316_quadruplet_ssim_12-29-15-57-50/ckpt_epoch_3000.pth",
                         dest="model_path")
     parser.add_argument("--loss_path", type=str,
                         default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet64v2_quadruplet_stssim_12-28-16-20-06/loss_epoch_3000.pth",
                         dest="loss_path")
-    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet32v316")
+    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet3v316")
     parser.add_argument('--loss', type=str, dest='loss', default="SSIM")
     parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
     parser.add_argument("--option", type=str, dest="option", default='RGB')
@@ -297,7 +297,7 @@ if __name__ == '__main__':
     inference.eval()
 
     if args.loss == "SSIM":
-        Loss = SSIM(data_range=1., size_average=False, win_size=7, channel=32)
+        Loss = SSIM(data_range=1., size_average=False, win_size=7, channel=3)
     elif args.loss == "RSSSIM":
         Loss = RSSSIM(data_range=1., size_average=False, win_size=11, channel=64, v_shift=args.v_shift,
                       h_shift=args.h_shift, angle=args.rotate_angle, step=args.step_size)

@@ -177,8 +177,8 @@ class STNResRFNet3v232(torch.nn.Module):
         self.stnres1 = STNResidualBlock(64, 32, 32)
         self.stnres2 = STNResidualBlock(64, 32, 32)
         self.stnres3 = STNResidualBlock(64, 32, 32)
-        self.conv5 = ConvLayer(64, 32, kernel_size=3, stride=1)
-        self.conv6 = ConvLayer(32, 3, kernel_size=3, stride=1)
+        self.conv4 = ConvLayer(64, 32, kernel_size=3, stride=1)
+        self.conv5 = ConvLayer(32, 3, kernel_size=3, stride=1)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
@@ -186,14 +186,13 @@ class STNResRFNet3v232(torch.nn.Module):
         conv1 = F.relu(self.conv1(x))
         conv2 = F.relu(self.conv2(conv1))
         conv3 = F.relu(self.conv3(conv2))
-        conv4 = F.relu(self.conv4(conv3))
-        resid1 = self.resid1(conv4)
+        resid1 = self.resid1(conv3)
         stnres1 = self.stnres1(resid1)
         stnres2 = self.stnres2(stnres1)
         stnres3 = self.stnres3(stnres2)
-        conv5 = self.relu(self.conv5(stnres3))
-        conv6 = self.sigmoid(self.conv6(conv5))
-        return conv6
+        conv4 = self.relu(self.conv4(stnres3))
+        conv5 = self.sigmoid(self.conv5(conv4))
+        return conv5
 
 
 class STNResRFNet32v316(torch.nn.Module):

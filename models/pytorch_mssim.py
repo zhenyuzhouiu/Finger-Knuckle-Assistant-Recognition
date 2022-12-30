@@ -29,6 +29,18 @@ def generate_theta(i_radian, i_tx, i_ty, i_batch_size, i_h, i_w, i_dtype):
     return theta
 
 
+def generate_batch_theta(i_radian, i_tx, i_ty, i_batch_size, i_h, i_w, i_dtype):
+    # if you want to keep ration when rotation a rectangle image
+    theta = torch.tensor([[math.cos(i_radian), math.sin(-i_radian) * i_h / i_w, i_tx],
+                          [math.sin(i_radian) * i_w / i_h, math.cos(i_radian), i_ty]],
+                         dtype=i_dtype).unsqueeze(0).repeat(i_batch_size, 1, 1)
+    # else
+    # theta = torch.tensor([[math.cos(i_radian), math.sin(-i_radian), i_tx],
+    #                       [math.sin(i_radian), math.cos(i_radian), i_ty]],
+    #                      dtype=i_dtype).unsqueeze(0).repeat(i_batch_size, 1, 1)
+    return theta
+
+
 def _fspecial_gauss_1d(size, sigma):
     r"""Create 1-D gauss kernel
     Args:

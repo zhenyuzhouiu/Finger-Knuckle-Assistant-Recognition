@@ -34,8 +34,9 @@ def build_parser():
     # Model
     parser.add_argument('--model', type=str, dest='model', default="STNResRFNet3v316")
     parser.add_argument('--loss_type', type=str, dest="loss_type", default="rsssim_speed")
-    parser.add_argument('--win_size', type=int, dest="win_size", default="7")
-    parser.add_argument("--out_channel", type=int, dest="out_channel", default="3")
+    parser.add_argument('--data_range', type=float, dest="data_range", default=1.)
+    parser.add_argument('--win_size', type=int, dest="win_size", default=7)
+    parser.add_argument("--out_channel", type=int, dest="out_channel", default=3)
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
     parser.add_argument('--if_hsv', type=bool, dest="if_hsv", default=False)
     parser.add_argument('--if_rotation', type=bool, dest="if_rotation", default=False)

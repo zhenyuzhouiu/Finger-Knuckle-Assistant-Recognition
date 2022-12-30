@@ -9,7 +9,7 @@ import time
 import models.loss_function
 from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
     STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, DilateRFNet64, \
-    RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet64v4, STNResRFNet64v5, STNResRFNet32v216, STNResRFNet32v316, STNResRFNet3v316
+    RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet64v4, STNResRFNet64v5, STNResRFNet32v216, STNResRFNet32v316, STNResRFNet3v316, STNResRFNet3v216
 from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM
 from torchvision import transforms
@@ -47,7 +47,8 @@ model_dict = {
     "STNResRFNet64v5": STNResRFNet64v5().cuda(),
     "STNResRFNet32v216": STNResRFNet32v216().cuda(),
     "STNResRFNet32v316": STNResRFNet32v316().cuda(),
-    "STNResRFNet3v316": STNResRFNet3v316().cuda()
+    "STNResRFNet3v316": STNResRFNet3v316().cuda(),
+    "STNResRFNet3v216": STNResRFNet3v216().cuda()
 }
 
 
@@ -74,7 +75,7 @@ class Model(object):
                                 if_aug=args.if_augment, if_hsv=args.if_hsv, if_rotation=args.if_rotation,
                                 if_translation=args.if_translation, if_scale=args.if_scale)
         logging("Successfully Load {} as training dataset...".format(args.train_path))
-        train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
+        train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=8)
 
         if args.n_tuple in ['triplet']:
             examples = iter(train_loader)
@@ -129,7 +130,7 @@ class Model(object):
                               "STNRFNet64", "STNResRFNet64", "STNResRFNet64v2", "STNResRFNet64v3",
                               "DilateRFNet64", "DeformRFNet64", "RFNet64Relu", "STNResRFNet64v2Relu",
                               "STNResRFNet64v4", "STNResRFNet64v5", "STNResRFNet32v216", "STNResRFNet32v316",
-                              "STNResRFNet3v316"]:
+                              "STNResRFNet3v316", "STNResRFNet3v216"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         if args.model == "RFNet":
@@ -161,7 +162,7 @@ class Model(object):
                 logging("Successfully building stssim loss")
             else:
                 if args.loss_type == "rsssim":
-                    loss = RSSSIM(data_range=1., size_average=False, channel=32, win_size=7, v_shift=args.vertical_size,
+                    loss = RSSSIM(data_range=1., size_average=False, channel=3, win_size=7, v_shift=args.vertical_size,
                                   h_shift=args.horizontal_size, angle=args.rotate_angle, step=args.step_size).cuda()
                     logging("Successfully building rsssim loss")
                 else:

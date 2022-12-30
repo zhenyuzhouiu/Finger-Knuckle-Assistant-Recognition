@@ -135,6 +135,37 @@ class STNResRFNet32v216(torch.nn.Module):
         return conv5
 
 
+class STNResRFNet3v216(torch.nn.Module):
+    def __init__(self):
+        super(STNResRFNet3v216, self).__init__()
+        # Initial convolution layers
+        self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
+        self.conv2 = ConvLayer(32, 64, kernel_size=3, stride=2)
+        self.conv3 = ConvLayer(64, 64, kernel_size=3, stride=1)
+        self.conv4 = ConvLayer(64, 64, kernel_size=3, stride=2)
+        self.resid1 = ResidualBlock(64)
+        self.stnres1 = STNResidualBlock(64, 16, 16)
+        self.stnres2 = STNResidualBlock(64, 16, 16)
+        self.stnres3 = STNResidualBlock(64, 16, 16)
+        self.conv5 = ConvLayer(64, 32, kernel_size=3, stride=1)
+        self.conv6 = ConvLayer(32, 3, kernel_size=3, stride=1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        conv1 = F.relu(self.conv1(x))
+        conv2 = F.relu(self.conv2(conv1))
+        conv3 = F.relu(self.conv3(conv2))
+        conv4 = F.relu(self.conv4(conv3))
+        resid1 = self.resid1(conv4)
+        stnres1 = self.stnres1(resid1)
+        stnres2 = self.stnres2(stnres1)
+        stnres3 = self.stnres3(stnres2)
+        conv5 = self.relu(self.conv5(stnres3))
+        conv6 = self.sigmoid(self.conv6(conv5))
+        return conv6
+
+
 class STNResRFNet32v316(torch.nn.Module):
     def __init__(self):
         super(STNResRFNet32v316, self).__init__()

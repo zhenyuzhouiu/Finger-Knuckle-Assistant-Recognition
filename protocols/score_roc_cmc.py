@@ -9,7 +9,8 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
     STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, \
-    DilateRFNet64, RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet32v216, STNResRFNet32v316, STNResRFNet3v316, STNResRFNet3v216
+    DilateRFNet64, RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet32v216, STNResRFNet32v316, \
+    STNResRFNet3v316, STNResRFNet3v216, STNResRFNet3v332, STNResRFNet3v232
 from torch.autograd import Variable
 from protocols.plot.plotroc_basic import *
 from protocols.confusionmatrix.protocol_util import *
@@ -35,7 +36,10 @@ model_dict = {
     "STNResRFNet32v216": STNResRFNet32v216(),
     "STNResRFNet32v316": STNResRFNet32v316(),
     "STNResRFNet3v316": STNResRFNet3v316(),
-    "STNResRFNet3v216": STNResRFNet3v216()
+    "STNResRFNet3v216": STNResRFNet3v216(),
+    "STNResRFNet3v332": STNResRFNet3v332(),
+    "STNResRFNet3v232": STNResRFNet3v232(),
+
 }
 
 

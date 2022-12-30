@@ -158,7 +158,7 @@ class Model(object):
             logging("Successfully building shiftedloss loss")
         else:
             if args.loss_type == "ssim":
-                loss = SSIM(data_range=1., size_average=False, channel=args.out_channel, win_size=args.win_size).cuda()
+                loss = SSIM(data_range=args.data_range, size_average=False, channel=args.out_channel, win_size=args.win_size).cuda()
                 logging("Successfully building ssim triplet loss")
             elif args.loss_type == "stssim":
                 loss = STSSIM(data_range=1., size_average=False, channel=64).cuda()
@@ -170,7 +170,7 @@ class Model(object):
                                   angle=args.rotate_angle, step=args.step_size).cuda()
                     logging("Successfully building rsssim loss")
                 elif args.loss_type == "rsssim_speed":
-                    loss = SpeedupRSSSIM(data_range=1., size_average=False, channel=args.out_channel,
+                    loss = SpeedupRSSSIM(data_range=args.data_range, size_average=False, channel=args.out_channel,
                                          win_size=args.win_size, v_shift=args.vertical_size,
                                          h_shift=args.horizontal_size, angle=args.rotate_angle, step=args.step_size).cuda()
                     logging("Successfully building speeduprsssim loss")

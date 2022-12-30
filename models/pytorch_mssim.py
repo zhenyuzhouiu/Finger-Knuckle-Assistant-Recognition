@@ -1,5 +1,6 @@
 # Copyright 2020 by Gongfan Fang, Zhejiang University.
 # All rights reserved.
+
 import warnings
 
 import torch
@@ -374,6 +375,78 @@ class RSSSIM(torch.nn.Module):
                         # min_dist, _ = torch.min(min_dist, dim=0)
                     n_affine += 1
 
+        min_dist, _ = torch.min(min_dist, dim=0)
+        return min_dist
+
+
+class SpeedupRSSSIM(torch.nn.Module):
+    def __init__(
+            self,
+            data_range=255,
+            size_average=True,
+            win_size=11,
+            win_sigma=1.5,
+            channel=3,
+            spatial_dims=2,
+            K=(0.01, 0.03),
+            nonnegative_ssim=False,
+            v_shift=0,
+            h_shift=0,
+            angle=0,
+            step=0,
+    ):
+        r""" class for ssim
+        Args:
+            data_range (float or int, optional): value range of input images. (usually 1.0 or 255)
+            size_average (bool, optional): if size_average=True, ssim of all images will be averaged as a scalar
+            win_size: (int, optional): the size of gauss kernel
+            win_sigma: (float, optional): sigma of normal distribution
+            channel (int, optional): input channels (default: 3)
+            K (list or tuple, optional): scalar constants (K1, K2). Try a larger K2 constant (e.g. 0.4) if you get a negative or NaN results.
+            nonnegative_ssim (bool, optional): force the ssim response to be nonnegative with relu.
+        """
+
+        super(SpeedupRSSSIM, self).__init__()
+        self.win_size = win_size
+        self.win = _fspecial_gauss_1d(win_size, win_sigma).repeat([channel, 1] + [1] * spatial_dims)
+        self.size_average = size_average
+        self.data_range = data_range
+        self.K = K
+        self.nonnegative_ssim = nonnegative_ssim
+        self.v_shift = v_shift
+        self.h_shift = h_shift
+        self.angle = angle
+        self.step = step
+
+    def forward(self, X, Y):
+        b, c, h, w = X.shape
+
+        if self.v_shift == self.h_shift == self.angle == 0:
+            min_dist = 1 - ssim(X, Y, data_range=self.data_range, size_average=self.size_average,
+                                win=self.win, K=self.K, nonnegative_ssim=self.nonnegative_ssim)
+            return min_dist
+
+        index = 0
+        for tx in range(-self.h_shift, self.h_shift + 1, self.step):
+            for ty in range(-self.v_shift, self.v_shift + 1, self.step):
+                for a in range(-self.angle, self.angle + 1, self.step):
+                    radian_a = a * math.pi / 180.
+                    ratio_tx = 2 * tx / w
+                    ratio_ty = 2 * ty / h
+                    theta = generate_theta(radian_a, ratio_tx, ratio_ty, b, h, w, Y.dtype).to(Y.device)
+                    if index == 0:
+                        batch_theta = theta
+                    else:
+                        batch_theta = torch.cat([batch_theta, theta], dim=0)
+                    index += 1
+        # grid = [b*index, h, w ,2]
+        Y = Y.repeat(index, 1, 1, 1)
+        grid = F.affine_grid(batch_theta, Y.size(), align_corners=False).to(Y.device)
+        r_Y = F.grid_sample(Y, grid, align_corners=False)
+        X = X.repeat(index, 1, 1, 1)
+        mean_ssim = 1 - ssim(X, r_Y, data_range=self.data_range, size_average=self.size_average,
+                             win=self.win, K=self.K, nonnegative_ssim=self.nonnegative_ssim)
+        min_dist = mean_ssim.view(-1, b)
         min_dist, _ = torch.min(min_dist, dim=0)
         return min_dist
 

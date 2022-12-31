@@ -6,6 +6,7 @@ import torch
 import cv2
 import argparse
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
     STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, \
@@ -273,66 +274,68 @@ if __name__ == '__main__':
     parser.add_argument("--test_path", type=str,
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
-    parser.add_argument("--out_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v316_quadruplet_ssim_12-29-15-57-50/output/",
-                        dest="out_path")
-    parser.add_argument("--model_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v316_quadruplet_ssim_12-29-15-57-50/ckpt_epoch_3000.pth",
-                        dest="model_path")
-    parser.add_argument("--loss_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v216_quadruplet_rsssim_12-29-20-55-14/loss_epoch_3000.pth",
-                        dest="loss_path")
-    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet3v316")
-    parser.add_argument('--loss', type=str, dest='loss', default="SSIM")
-    parser.add_argument('--data_range', type=float, dest='data_range', default=1.0)
-    parser.add_argument('--out_channel', type=int, dest='out_channel', default="3")
-    parser.add_argument('--win_size', type=int, dest='win_size', default="7")
-    parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
+    parser.add_argument("--hyper_parameter", type=str,
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNRFNet64_quadruplet_rsssim/hyper_parameter.txt",
+                        dest="hyper_parameter")
+    parser.add_argument("--check_point", type=str,
+                        default="3000.pth",
+                        dest="check_point")
     parser.add_argument("--option", type=str, dest="option", default='RGB')
-    parser.add_argument("--v_shift", type=int, dest="v_shift", default=4)
-    parser.add_argument("--h_shift", type=int, dest="h_shift", default=4)
-    parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=4)
-    parser.add_argument("--step_size", type=int, dest="step_size", default=1)
     parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
     parser.add_argument("--gpu_num", type=int, dest="gpu_num", default=1)
     parser.add_argument("--if_draw", type=bool, dest="if_draw", default=True)
     args = parser.parse_args()
 
+    para_dict = {}
+    with open(args.hyper_parameter, "r") as para_file:
+        para = para_file.readlines()
+        for p in para:
+            key = p.split(":")[0]
+            value = p.split(":")[-1].strip('\n')
+            para_dict[key] = value
+
     cls_num = ['01', '02', '04', '07']
 
-    if not os.path.exists(args.out_path):
-        os.mkdir(args.out_path)
+    if not os.path.exists(para_dict['checkpoint_dir'] + '/output'):
+        os.mkdir(para_dict['checkpoint_dir'] + '/output')
 
-    inference = model_dict[args.model].cuda(args.gpu_num)
-    inference.load_state_dict(torch.load(args.model_path))
+    inference = model_dict[para_dict['model']].cuda(args.gpu_num)
+    inference.load_state_dict(torch.load(para_dict['checkpoint_dir'] + '/ckpt_epoch_' + args.check_point))
     inference.eval()
 
-    if args.loss == "SSIM":
-        Loss = SSIM(data_range=args.data_range, size_average=False, win_size=args.win_size, channel=args.out_channel)
-    elif args.loss == "RSSSIM":
-        Loss = RSSSIM(data_range=args.data_range, size_average=False, win_size=args.win_size, channel=args.out_channel,
-                      v_shift=args.v_shift,
-                      h_shift=args.h_shift, angle=args.rotate_angle, step=args.step_size)
+    if para_dict['loss_type'] == "ssim":
+        Loss = SSIM(data_range=float(para_dict['data_range']), size_average=False,
+                    win_size=int(para_dict['win_size']), channel=int(para_dict['out_channel']))
+    elif para_dict['loss_type'] == "rsssim":
+        Loss = RSSSIM(data_range=float(para_dict['data_range']), size_average=False,
+                      win_size=int(para_dict['win_size']), channel=int(para_dict['out_channel']),
+                      v_shift=int(para_dict['vertical_size']),
+                      h_shift=int(para_dict['horizontal_size']), angle=int(para_dict['rotate_angle']),
+                      step=int(para_dict['step_size']))
     else:
-        if args.loss == "STSSIM":
-            Loss = STSSIM(data_range=1., size_average=False, channel=64)
-        elif args.loss == "SpeedupRSSSIM":
-            Loss = SpeedupRSSSIM(data_range=args.data_range, size_average=False, win_size=args.win_size,
-                                 channel=args.out_channel, v_shift=args.v_shift, h_shift=args.h_shift,
-                                 angle=args.rotate_angle, step=args.step_size)
+        if para_dict['loss_type'] == "stssim":
+            Loss = STSSIM(data_range=float(para_dict['data_range']), size_average=False,
+                          win_size=int(para_dict['win_size']), channel=int(para_dict['out_channel']))
+        elif para_dict['loss_type'] == "SpeedupRSSSIM":
+            Loss = SpeedupRSSSIM(data_range=float(para_dict['data_range']), size_average=False,
+                                 win_size=int(para_dict['win_size']), channel=int(para_dict['out_channel']),
+                                 v_shift=int(para_dict['vertical_size']),
+                                 h_shift=int(para_dict['horizontal_size']), angle=int(para_dict['rotate_angle']),
+                                 step=int(para_dict['step_size']))
         else:
-            if args.loss == "ShiftedLoss":
-                Loss = ShiftedLoss(hshift=args.h_shift, vshift=args.v_shift)
+            if para_dict['loss_type'] == "shiftedloss":
+                Loss = ShiftedLoss(hshift=int(para_dict['horizontal_size']), vshift=int(para_dict['vertical_size']))
     Loss.cuda(args.gpu_num)
-    if args.loss == "STSSIM":
-        Loss.load_state_dict(torch.load(args.loss_path))
+    if para_dict['loss_type'] == "stssim":
+        Loss.load_state_dict(torch.load(para_dict['checkpoint_dir'] + '/loss_epoch_' + args.check_point))
     Loss.eval()
 
     for c in cls_num:
         test_path = os.path.join(args.test_path, c)
-        out_path = os.path.join(args.out_path, c + ".mat")
-        gscores, iscores, mmat = genuine_imposter_upright(test_path=test_path, image_size=args.default_size,
-                                                          options= args.option, inference=inference, loss_model=Loss, gpu_num= args.gpu_num)
+        out_path = os.path.join(para_dict['checkpoint_dir'] + '/output', c + ".mat")
+        gscores, iscores, mmat = genuine_imposter_upright(test_path=test_path, image_size=para_dict['input_size'],
+                                                          options=args.option, inference=inference, loss_model=Loss,
+                                                          gpu_num=args.gpu_num)
 
         if args.save_mmat:
             io.savemat(out_path, {"g_scores": gscores, "i_scores": iscores, "mmat": mmat})
@@ -358,4 +361,4 @@ if __name__ == '__main__':
             src_mat.append(os.path.join(args.out_path, c + ".mat"))
             label.append(c)
 
-        draw_roc(src_mat, color, label, dst=args.out_path)
+        draw_roc(src_mat, color, label, dst=para_dict['checkpoint_dir'] + '/output')

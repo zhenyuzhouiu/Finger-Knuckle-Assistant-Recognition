@@ -292,9 +292,9 @@ class STNResRFNet3v332(torch.nn.Module):
         return conv7
 
 
-class STNResRFNet3v332_255(torch.nn.Module):
+class STResNet(torch.nn.Module):
     def __init__(self):
-        super(STNResRFNet3v332_255, self).__init__()
+        super(STResNet, self).__init__()
         # Initial convolution layers
         self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
         self.conv2 = ConvLayer(32, 32, kernel_size=3, stride=1)
@@ -320,6 +320,72 @@ class STNResRFNet3v332_255(torch.nn.Module):
         conv5 = self.relu(self.conv5(stnres1))
         stnres2 = self.stnres2(conv5)
         stnres3 = self.stnres3(stnres2)
+        conv6 = self.relu(self.conv6(stnres3))
+        conv7 = self.relu(self.conv7(conv6))
+        return conv7
+
+
+class STResNet16(torch.nn.Module):
+    def __init__(self):
+        super(STResNet16, self).__init__()
+        # Initial convolution layers
+        self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
+        self.conv2 = ConvLayer(32, 32, kernel_size=3, stride=1)
+        self.resid1 = ResidualBlock(32)
+        self.conv3 = ConvLayer(32, 64, kernel_size=3, stride=2)
+        self.conv4 = ConvLayer(64, 64, kernel_size=3, stride=1)
+        self.stnres1 = STNResidualBlock(64, 32, 32)
+        self.conv5 = ConvLayer(64, 64, kernel_size=3, stride=2)
+        self.stnres2 = STNResidualBlock(64, 16, 16)
+        self.stnres3 = STNResidualBlock(64, 16, 16)
+        self.conv6 = ConvLayer(64, 32, kernel_size=3, stride=1)
+        self.conv7 = ConvLayer(32, 3, kernel_size=3, stride=1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        conv1 = self.relu(self.conv1(x))
+        conv2 = self.relu(self.conv2(conv1))
+        resid1 = self.resid1(conv2)
+        conv3 = self.relu(self.conv3(resid1))
+        conv4 = self.relu(self.conv4(conv3))
+        stnres1 = self.stnres1(conv4)
+        conv5 = self.relu(self.conv5(stnres1))
+        stnres2 = self.stnres2(conv5)
+        stnres3 = self.stnres3(stnres2)
+        conv6 = self.relu(self.conv6(stnres3))
+        conv7 = self.relu(self.conv7(conv6))
+        return conv7
+
+
+class STResNetRelu(torch.nn.Module):
+    def __init__(self):
+        super(STResNetRelu, self).__init__()
+        # Initial convolution layers
+        self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
+        self.conv2 = ConvLayer(32, 32, kernel_size=3, stride=1)
+        self.resid1 = ResidualBlock(32)
+        self.conv3 = ConvLayer(32, 64, kernel_size=3, stride=2)
+        self.conv4 = ConvLayer(64, 64, kernel_size=3, stride=1)
+        self.stnres1 = STNResidualBlock(64, 32, 32)
+        self.conv5 = ConvLayer(64, 64, kernel_size=3, stride=1)
+        self.stnres2 = STNResidualBlock(64, 32, 32)
+        self.stnres3 = STNResidualBlock(64, 32, 32)
+        self.conv6 = ConvLayer(64, 32, kernel_size=3, stride=1)
+        self.conv7 = ConvLayer(32, 3, kernel_size=3, stride=1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        conv1 = self.relu(self.conv1(x))
+        conv2 = self.relu(self.conv2(conv1))
+        resid1 = self.relu(self.resid1(conv2))
+        conv3 = self.relu(self.conv3(resid1))
+        conv4 = self.relu(self.conv4(conv3))
+        stnres1 = self.relu(self.stnres1(conv4))
+        conv5 = self.relu(self.conv5(stnres1))
+        stnres2 = self.relu(self.stnres2(conv5))
+        stnres3 = self.relu(self.stnres3(stnres2))
         conv6 = self.relu(self.conv6(stnres3))
         conv7 = self.relu(self.conv7(conv6))
         return conv7

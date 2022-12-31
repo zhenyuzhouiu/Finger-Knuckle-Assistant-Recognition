@@ -10,11 +10,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
     STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, \
     DilateRFNet64, RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet32v216, STNResRFNet32v316, \
-    STNResRFNet3v316, STNResRFNet3v216, STNResRFNet3v332, STNResRFNet3v232
+    STNResRFNet3v316, STNResRFNet3v216, STNResRFNet3v332, STNResRFNet3v232, STNResRFNet3v332_255
 from torch.autograd import Variable
 from protocols.plot.plotroc_basic import *
 from protocols.confusionmatrix.protocol_util import *
-from models.pytorch_mssim import SSIM, RSSSIM
+from models.pytorch_mssim import SSIM, RSSSIM, SpeedupRSSSIM
 from loss.stn_ssim import STSSIM
 from models.loss_function import ShiftedLoss
 import matplotlib.pyplot as plt
@@ -39,6 +39,7 @@ model_dict = {
     "STNResRFNet3v216": STNResRFNet3v216(),
     "STNResRFNet3v332": STNResRFNet3v332(),
     "STNResRFNet3v232": STNResRFNet3v232(),
+    "STNResRFNet3v332_255": STNResRFNet3v332_255()
 
 }
 
@@ -153,7 +154,7 @@ def genuine_imposter_upright(test_path, image_size, options, inference, loss_mod
         y = feats_all[i:, :, :, :]
         bs, ch, he, wi = x.shape
         loss = np.ones(bs, ) * 1e5
-        chuncks = 6000
+        chuncks = 300
         if bs > chuncks:
             num_chuncks = bs // chuncks
             num_reminder = bs % chuncks
@@ -271,16 +272,19 @@ if __name__ == '__main__':
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
     parser.add_argument("--out_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v216_quadruplet_rsssim_12-29-20-55-14/output/",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v316_quadruplet_rsssim_speed_12-30-16-46-10/output/",
                         dest="out_path")
     parser.add_argument("--model_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v216_quadruplet_rsssim_12-29-20-55-14/ckpt_epoch_1460.pth",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v316_quadruplet_rsssim_speed_12-30-16-46-10/ckpt_epoch_3000.pth",
                         dest="model_path")
     parser.add_argument("--loss_path", type=str,
                         default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v216_quadruplet_rsssim_12-29-20-55-14/loss_epoch_3000.pth",
                         dest="loss_path")
-    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet3v216")
-    parser.add_argument('--loss', type=str, dest='loss', default="RSSSIM")
+    parser.add_argument('--model', type=str, dest='model', default="STNResRFNet3v316")
+    parser.add_argument('--loss', type=str, dest='loss', default="SpeedupRSSSIM")
+    parser.add_argument('--data_range', type=float, dest='data_range', default=1.0)
+    parser.add_argument('--out_channel', type=int, dest='out_channel', default="3")
+    parser.add_argument('--win_size', type=int, dest='win_size', default="7")
     parser.add_argument("--default_size", type=int, dest="default_size", default=(128, 128))
     parser.add_argument("--option", type=str, dest="option", default='RGB')
     parser.add_argument("--v_shift", type=int, dest="v_shift", default=4)
@@ -288,7 +292,7 @@ if __name__ == '__main__':
     parser.add_argument("--rotate_angle", type=int, dest="rotate_angle", default=4)
     parser.add_argument("--step_size", type=int, dest="step_size", default=1)
     parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-    parser.add_argument("--gpu_num", type=int, dest="gpu_num", default=0)
+    parser.add_argument("--gpu_num", type=int, dest="gpu_num", default=1)
     parser.add_argument("--if_draw", type=bool, dest="if_draw", default=True)
     args = parser.parse_args()
 
@@ -302,13 +306,18 @@ if __name__ == '__main__':
     inference.eval()
 
     if args.loss == "SSIM":
-        Loss = SSIM(data_range=1., size_average=False, win_size=7, channel=3)
+        Loss = SSIM(data_range=args.data_range, size_average=False, win_size=args.win_size, channel=args.out_channel)
     elif args.loss == "RSSSIM":
-        Loss = RSSSIM(data_range=1., size_average=False, win_size=7, channel=3, v_shift=args.v_shift,
+        Loss = RSSSIM(data_range=args.data_range, size_average=False, win_size=args.win_size, channel=args.out_channel,
+                      v_shift=args.v_shift,
                       h_shift=args.h_shift, angle=args.rotate_angle, step=args.step_size)
     else:
         if args.loss == "STSSIM":
             Loss = STSSIM(data_range=1., size_average=False, channel=64)
+        elif args.loss == "SpeedupRSSSIM":
+            Loss = SpeedupRSSSIM(data_range=args.data_range, size_average=False, win_size=args.win_size,
+                                 channel=args.out_channel, v_shift=args.v_shift, h_shift=args.h_shift,
+                                 angle=args.rotate_angle, step=args.step_size)
         else:
             Loss = ShiftedLoss(hshift=args.h_shift, vshift=args.v_shift)
     Loss.cuda(args.gpu_num)

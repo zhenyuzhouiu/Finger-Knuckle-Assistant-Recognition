@@ -8,10 +8,8 @@ import argparse
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
-    STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, \
-    DilateRFNet64, RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet32v216, STNResRFNet32v316, \
-    STNResRFNet3v316, STNResRFNet3v216, STNResRFNet3v332, STNResRFNet3v232, STResNet, STResNetRelu, STResNet16
+from models.net_model import ResidualFeatureNet, STResNet_R, STResNet_S, \
+    STResNetRelu_R, STResNetRelu_S, STResNet16_R, STResNet16_S
 from torch.autograd import Variable
 from protocols.plot.plotroc_basic import *
 from protocols.confusionmatrix.protocol_util import *
@@ -24,26 +22,12 @@ import tqdm
 
 model_dict = {
     "RFNet": ResidualFeatureNet(),
-    "RFNet64": RFNet64(),
-    "SERFNet64": SERFNet64(),
-    "STNRFNet64": STNRFNet64(),
-    "STNResRFNet64": STNResRFNet64(),
-    "STNResRFNet64v2": STNResRFNet64v2(),
-    "STNResRFNet64v3": STNResRFNet64v3(),
-    "DeformRFNet64": DeformRFNet64(),
-    "DilateRFNet64": DilateRFNet64(),
-    "RFNet64Relu": RFNet64Relu(),
-    "STNResRFNet64v2Relu": STNResRFNet64v2Relu(),
-    "STNResRFNet32v216": STNResRFNet32v216(),
-    "STNResRFNet32v316": STNResRFNet32v316(),
-    "STNResRFNet3v316": STNResRFNet3v316(),
-    "STNResRFNet3v216": STNResRFNet3v216(),
-    "STNResRFNet3v332": STNResRFNet3v332(),
-    "STNResRFNet3v232": STNResRFNet3v232(),
-    "STResNet": STResNet().cuda(),
-    "STResNetRelu": STResNetRelu().cuda(),
-    "STResNet16": STResNet16().cuda()
-
+    "STResNet_R": STResNet_R(),
+    "STResNet_S": STResNet_S(),
+    "STResNetRelu_R": STResNetRelu_R(),
+    "STResNetRelu_S": STResNetRelu_S(),
+    "STResNet16_R": STResNet16_R(),
+    "STResNet16_S": STResNet16_S()
 }
 
 
@@ -275,14 +259,14 @@ if __name__ == '__main__':
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
     parser.add_argument("--hyper_parameter", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNRFNet64_quadruplet_rsssim/hyper_parameter.txt",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STResNet_S_quadruplet_ssim_12-31-23-16-15/hyper_parameter.txt",
                         dest="hyper_parameter")
     parser.add_argument("--check_point", type=str,
                         default="3000.pth",
                         dest="check_point")
     parser.add_argument("--option", type=str, dest="option", default='RGB')
     parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-    parser.add_argument("--gpu_num", type=int, dest="gpu_num", default=1)
+    parser.add_argument("--gpu_num", type=int, dest="gpu_num", default=0)
     parser.add_argument("--if_draw", type=bool, dest="if_draw", default=True)
     args = parser.parse_args()
 
@@ -292,15 +276,18 @@ if __name__ == '__main__':
         for p in para:
             key = p.split(":")[0]
             value = p.split(":")[-1].strip('\n')
-            para_dict[key] = value
+            if key == "input_size":
+                v_tuple = (int(value[1:4]), int(value[6:9]))
+                para_dict[key] = v_tuple
+            else:para_dict[key] = value
 
     cls_num = ['01', '02', '04', '07']
 
-    if not os.path.exists(para_dict['checkpoint_dir'] + '/output'):
-        os.mkdir(para_dict['checkpoint_dir'] + '/output')
+    if not os.path.exists('.' + para_dict['checkpoint_dir'] + '/output'):
+        os.mkdir('.' + para_dict['checkpoint_dir'] + '/output')
 
     inference = model_dict[para_dict['model']].cuda(args.gpu_num)
-    inference.load_state_dict(torch.load(para_dict['checkpoint_dir'] + '/ckpt_epoch_' + args.check_point))
+    inference.load_state_dict(torch.load('.' + para_dict['checkpoint_dir'] + '/ckpt_epoch_' + args.check_point))
     inference.eval()
 
     if para_dict['loss_type'] == "ssim":
@@ -316,7 +303,7 @@ if __name__ == '__main__':
         if para_dict['loss_type'] == "stssim":
             Loss = STSSIM(data_range=float(para_dict['data_range']), size_average=False,
                           win_size=int(para_dict['win_size']), channel=int(para_dict['out_channel']))
-        elif para_dict['loss_type'] == "SpeedupRSSSIM":
+        elif para_dict['loss_type'] == "rsssim_speed":
             Loss = SpeedupRSSSIM(data_range=float(para_dict['data_range']), size_average=False,
                                  win_size=int(para_dict['win_size']), channel=int(para_dict['out_channel']),
                                  v_shift=int(para_dict['vertical_size']),
@@ -327,12 +314,12 @@ if __name__ == '__main__':
                 Loss = ShiftedLoss(hshift=int(para_dict['horizontal_size']), vshift=int(para_dict['vertical_size']))
     Loss.cuda(args.gpu_num)
     if para_dict['loss_type'] == "stssim":
-        Loss.load_state_dict(torch.load(para_dict['checkpoint_dir'] + '/loss_epoch_' + args.check_point))
+        Loss.load_state_dict(torch.load('.' + para_dict['checkpoint_dir'] + '/loss_epoch_' + args.check_point))
     Loss.eval()
 
     for c in cls_num:
         test_path = os.path.join(args.test_path, c)
-        out_path = os.path.join(para_dict['checkpoint_dir'] + '/output', c + ".mat")
+        out_path = os.path.join('.' + para_dict['checkpoint_dir'] + '/output', c + ".mat")
         gscores, iscores, mmat = genuine_imposter_upright(test_path=test_path, image_size=para_dict['input_size'],
                                                           options=args.option, inference=inference, loss_model=Loss,
                                                           gpu_num=args.gpu_num)
@@ -358,7 +345,7 @@ if __name__ == '__main__':
                  '#ff00ff',
                  '#ff0000']
         for c in cls_num:
-            src_mat.append(os.path.join(args.out_path, c + ".mat"))
+            src_mat.append(os.path.join('.' + para_dict['checkpoint_dir'] + '/output', c + ".mat"))
             label.append(c)
 
-        draw_roc(src_mat, color, label, dst=para_dict['checkpoint_dir'] + '/output')
+        draw_roc(src_mat, color, label, dst='.' + para_dict['checkpoint_dir'] + '/output')

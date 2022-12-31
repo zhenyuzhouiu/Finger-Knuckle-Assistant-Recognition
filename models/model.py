@@ -7,10 +7,8 @@ from torch.autograd import Variable
 import time
 
 import models.loss_function
-from models.net_model import ResidualFeatureNet, RFNet64, SERFNet64, \
-    STNRFNet64, STNResRFNet64, STNResRFNet64v2, STNResRFNet64v3, DeformRFNet64, DilateRFNet64, \
-    RFNet64Relu, STNResRFNet64v2Relu, STNResRFNet64v4, STNResRFNet64v5, STNResRFNet32v216, STNResRFNet32v316, \
-    STNResRFNet3v316, STNResRFNet3v216, STNResRFNet3v332, STNResRFNet3v232, STResNet, STResNetRelu, STResNet16
+from models.net_model import ResidualFeatureNet, STResNet_R, STResNet_S, \
+    STResNetRelu_R, STResNetRelu_S, STResNet16_R, STResNet16_S
 from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM, SpeedupRSSSIM
 from torchvision import transforms
@@ -33,28 +31,12 @@ def logging(msg, suc=True):
 
 model_dict = {
     "RFNet": ResidualFeatureNet().cuda(),
-    "FKEfficientNet": fk_efficientnetv2_s().cuda(),
-    "RFNet64": RFNet64().cuda(),
-    "SERFNet64": SERFNet64().cuda(),
-    "STNRFNet64": STNRFNet64().cuda(),
-    "STNResRFNet64": STNResRFNet64().cuda(),
-    "STNResRFNet64v2": STNResRFNet64v2().cuda(),
-    "STNResRFNet64v3": STNResRFNet64v3().cuda(),
-    "DilateRFNet64": DilateRFNet64().cuda(),
-    "DeformRFNet64": DeformRFNet64().cuda(),
-    "RFNet64Relu": RFNet64Relu().cuda(),
-    "STNResRFNet64v2Relu": STNResRFNet64v2Relu().cuda(),
-    "STNResRFNet64v4": STNResRFNet64v4().cuda(),
-    "STNResRFNet64v5": STNResRFNet64v5().cuda(),
-    "STNResRFNet32v216": STNResRFNet32v216().cuda(),
-    "STNResRFNet32v316": STNResRFNet32v316().cuda(),
-    "STNResRFNet3v316": STNResRFNet3v316().cuda(),
-    "STNResRFNet3v216": STNResRFNet3v216().cuda(),
-    "STNResRFNet3v332": STNResRFNet3v332().cuda(),
-    "STNResRFNet3v232": STNResRFNet3v232().cuda(),
-    "STResNet": STResNet().cuda(),
-    "STResNetRelu": STResNetRelu().cuda(),
-    "STResNet16": STResNet16().cuda()
+    "STResNet_R": STResNet_R().cuda(),
+    "STResNet_S": STResNet_S().cuda(),
+    "STResNetRelu_R": STResNetRelu_R().cuda(),
+    "STResNetRelu_S": STResNetRelu_S().cuda(),
+    "STResNet16_R": STResNet16_R().cuda(),
+    "STResNet16_S": STResNet16_S().cuda()
 }
 
 
@@ -132,12 +114,12 @@ class Model(object):
                 param_group['lr'] *= lr_decay
 
     def _build_model(self, args):
-        if args.model not in ["RFNet", "FKEfficientNet", "RFNet64", "RFNet64_16", "SERFNet64",
-                              "STNRFNet64", "STNResRFNet64", "STNResRFNet64v2", "STNResRFNet64v3",
-                              "DilateRFNet64", "DeformRFNet64", "RFNet64Relu", "STNResRFNet64v2Relu",
-                              "STNResRFNet64v4", "STNResRFNet64v5", "STNResRFNet32v216", "STNResRFNet32v316",
-                              "STNResRFNet3v316", "STNResRFNet3v216", "STNResRFNet3v332", "STNResRFNet3v232",
-                              "STResNet", "STResNetRelu", "STResNet16"]:
+        if args.model not in ["RFNet", "STResNet_R",
+                              "STResNet_S",
+                              "STResNetRelu_R",
+                              "STResNetRelu_S",
+                              "STResNet16_R",
+                              "STResNet16_S"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         if args.model == "RFNet":

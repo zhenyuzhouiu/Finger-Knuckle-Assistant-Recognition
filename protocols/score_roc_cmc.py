@@ -272,16 +272,16 @@ if __name__ == '__main__':
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
     parser.add_argument("--out_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v316_quadruplet_rsssim_speed_12-30-16-46-10/output/",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v316_quadruplet_ssim_12-29-15-57-50/output/",
                         dest="out_path")
     parser.add_argument("--model_path", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v316_quadruplet_rsssim_speed_12-30-16-46-10/ckpt_epoch_3000.pth",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v316_quadruplet_ssim_12-29-15-57-50/ckpt_epoch_3000.pth",
                         dest="model_path")
     parser.add_argument("--loss_path", type=str,
                         default="../checkpoint/Joint-Finger-RFNet/MaskLM_STNResRFNet3v216_quadruplet_rsssim_12-29-20-55-14/loss_epoch_3000.pth",
                         dest="loss_path")
     parser.add_argument('--model', type=str, dest='model', default="STNResRFNet3v316")
-    parser.add_argument('--loss', type=str, dest='loss', default="SpeedupRSSSIM")
+    parser.add_argument('--loss', type=str, dest='loss', default="SSIM")
     parser.add_argument('--data_range', type=float, dest='data_range', default=1.0)
     parser.add_argument('--out_channel', type=int, dest='out_channel', default="3")
     parser.add_argument('--win_size', type=int, dest='win_size', default="7")
@@ -319,7 +319,8 @@ if __name__ == '__main__':
                                  channel=args.out_channel, v_shift=args.v_shift, h_shift=args.h_shift,
                                  angle=args.rotate_angle, step=args.step_size)
         else:
-            Loss = ShiftedLoss(hshift=args.h_shift, vshift=args.v_shift)
+            if args.loss == "ShiftedLoss":
+                Loss = ShiftedLoss(hshift=args.h_shift, vshift=args.v_shift)
     Loss.cuda(args.gpu_num)
     if args.loss == "STSSIM":
         Loss.load_state_dict(torch.load(args.loss_path))

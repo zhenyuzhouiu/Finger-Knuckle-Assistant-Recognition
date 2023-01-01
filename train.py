@@ -26,6 +26,8 @@ def setup_seed(seed):
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
 
 def build_parser():
@@ -44,9 +46,9 @@ def build_parser():
     parser.add_argument('--n_tuple', type=str, dest='n_tuple',
                         default='quadruplet', help="how to select the input tuple, triplet, quadruplet, oldtriplet")
     # Model
-    parser.add_argument('--model', type=str, dest='model', default="STResNet16_S")
+    parser.add_argument('--model', type=str, dest='model', default="STResNetRelu_R")
     parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssim")
-    parser.add_argument('--data_range', type=float, dest="data_range", default=1.0)
+    parser.add_argument('--data_range', type=float, dest="data_range", default=255)
     parser.add_argument('--win_size', type=int, dest="win_size", default=13)
     parser.add_argument("--out_channel", type=int, dest="out_channel", default=3)
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)
@@ -56,7 +58,7 @@ def build_parser():
     parser.add_argument('--if_scale', type=bool, dest="if_scale", default=False)
 
     # Training StrategyResidualSTNet
-    parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
+    parser.add_argument('--batch_size', type=int, dest='batch_size', default=8)
     parser.add_argument('--epochs', type=int, dest='epochs', default=3000)
     parser.add_argument('--learning_rate1', type=float, dest='learning_rate1', default=1e-3)
     parser.add_argument('--learning_rate2', type=float, dest='learning_rate2', default=1e-3)
@@ -64,6 +66,7 @@ def build_parser():
     # Training Logging Interval
     parser.add_argument('--log_interval', type=int, dest='log_interval', default=1)
     # Pre-defined Options
+    parser.add_argument('--seed_num', type=int, dest="seed_num", default=20)
     parser.add_argument('--alpha', type=float, dest='alpha', default=0.6)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=0.3, help="the second margin of quadruplet loss")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
@@ -87,6 +90,8 @@ def build_parser():
 def main():
     parser = build_parser()
     args = parser.parse_args()
+
+    setup_seed(args.seed_num)
 
     this_datetime = datetime.datetime.now().strftime('%m-%d-%H-%M-%S')
     args.checkpoint_dir = os.path.join(
@@ -133,5 +138,4 @@ def main():
 
 
 if __name__ == "__main__":
-    setup_seed(20)
     main()

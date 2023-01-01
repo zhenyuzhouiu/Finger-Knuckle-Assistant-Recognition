@@ -141,7 +141,7 @@ def genuine_imposter_upright(test_path, image_size, options, inference, loss_mod
         y = feats_all[i:, :, :, :]
         bs, ch, he, wi = x.shape
         loss = np.ones(bs, ) * 1e5
-        chuncks = 300
+        chuncks = 100
         if bs > chuncks:
             num_chuncks = bs // chuncks
             num_reminder = bs % chuncks
@@ -259,7 +259,7 @@ if __name__ == '__main__':
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
     parser.add_argument("--hyper_parameter", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STResNet_S_quadruplet_ssim_12-31-23-16-15/hyper_parameter.txt",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STResNet_R_quadruplet_rsssim_speed_01-01-01-37-15/hyper_parameter.txt",
                         dest="hyper_parameter")
     parser.add_argument("--check_point", type=str,
                         default="3000.pth",

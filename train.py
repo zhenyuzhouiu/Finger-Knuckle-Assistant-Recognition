@@ -9,7 +9,7 @@ import torch
 import numpy as np
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import argparse
 import shutil
@@ -44,9 +44,9 @@ def build_parser():
     parser.add_argument('--n_tuple', type=str, dest='n_tuple',
                         default='quadruplet', help="how to select the input tuple, triplet, quadruplet, oldtriplet")
     # Model
-    parser.add_argument('--model', type=str, dest='model', default="STResNet_R")
-    parser.add_argument('--loss_type', type=str, dest="loss_type", default="rsssim_speed")
-    parser.add_argument('--data_range', type=float, dest="data_range", default=255.0)
+    parser.add_argument('--model', type=str, dest='model', default="STResNet16_S")
+    parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssim")
+    parser.add_argument('--data_range', type=float, dest="data_range", default=1.0)
     parser.add_argument('--win_size', type=int, dest="win_size", default=13)
     parser.add_argument("--out_channel", type=int, dest="out_channel", default=3)
     parser.add_argument('--if_augment', type=bool, dest="if_augment", default=False)

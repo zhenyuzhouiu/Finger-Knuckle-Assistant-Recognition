@@ -162,7 +162,7 @@ class STNResRFNet3v216(torch.nn.Module):
         stnres2 = self.stnres2(stnres1)
         stnres3 = self.stnres3(stnres2)
         conv5 = self.relu(self.conv5(stnres3))
-        conv6 = self.sigmoid(self.conv6(conv5))
+        conv6 = self.relu(self.conv6(conv5))
         return conv6
 
 
@@ -668,3 +668,101 @@ class SERFNet64(torch.nn.Module):
         # conv4.shape:-> [b, 64, 32, 32]
         return conv4
 
+
+class ResNet(torch.nn.Module):
+    def __init__(self):
+        super(ResNet, self).__init__()
+        # Initial convolution layers
+        self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
+        self.conv2 = ConvLayer(32, 32, kernel_size=3, stride=1)
+        self.resid1 = ResidualBlock(32)
+        self.conv3 = ConvLayer(32, 64, kernel_size=3, stride=2)
+        self.conv4 = ConvLayer(64, 64, kernel_size=3, stride=1)
+        self.resid2 = ResBlock(64)
+        self.conv5 = ConvLayer(64, 64, kernel_size=3, stride=1)
+        self.resid3 = ResBlock(64)
+        self.resid4 = ResBlock(64)
+        self.conv6 = ConvLayer(64, 32, kernel_size=3, stride=1)
+        self.conv7 = ConvLayer(32, 3, kernel_size=3, stride=1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        conv1 = self.relu(self.conv1(x))
+        conv2 = self.relu(self.conv2(conv1))
+        resid1 = self.relu(self.resid1(conv2))
+        conv3 = self.relu(self.conv3(resid1))
+        conv4 = self.relu(self.conv4(conv3))
+        resid2 = self.relu(self.resid2(conv4))
+        conv5 = self.relu(self.conv5(resid2))
+        resid3 = self.relu(self.resid3(conv5))
+        resid4 = self.relu(self.resid4(resid3))
+        conv6 = self.relu(self.conv6(resid4))
+        conv7 = self.relu(self.conv7(conv6))
+        return conv7
+
+
+class DeformResNet(torch.nn.Module):
+    def __init__(self):
+        super(DeformResNet, self).__init__()
+        # Initial convolution layers
+        self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
+        self.conv2 = ConvLayer(32, 32, kernel_size=3, stride=1)
+        self.resid1 = ResidualBlock(32)
+        self.conv3 = ConvLayer(32, 64, kernel_size=3, stride=2)
+        self.conv4 = ConvLayer(64, 64, kernel_size=3, stride=1)
+        self.deform1 = DeformResBlock(64)
+        self.conv5 = ConvLayer(64, 64, kernel_size=3, stride=1)
+        self.deform2 = DeformResBlock(64)
+        self.deform3 = DeformResBlock(64)
+        self.conv6 = ConvLayer(64, 32, kernel_size=3, stride=1)
+        self.conv7 = ConvLayer(32, 3, kernel_size=3, stride=1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        conv1 = self.relu(self.conv1(x))
+        conv2 = self.relu(self.conv2(conv1))
+        resid1 = self.relu(self.resid1(conv2))
+        conv3 = self.relu(self.conv3(resid1))
+        conv4 = self.relu(self.conv4(conv3))
+        deform1 = self.relu(self.deform1(conv4))
+        conv5 = self.relu(self.conv5(deform1))
+        deform2 = self.relu(self.deform2(conv5))
+        deform3 = self.relu(self.deform3(deform2))
+        conv6 = self.relu(self.conv6(deform3))
+        conv7 = self.relu(self.conv7(conv6))
+        return conv7
+
+
+class DilateResNet(torch.nn.Module):
+    def __init__(self):
+        super(DilateResNet, self).__init__()
+        # Initial convolution layers
+        self.conv1 = ConvLayer(3, 32, kernel_size=5, stride=2)
+        self.conv2 = ConvLayer(32, 32, kernel_size=3, stride=1)
+        self.resid1 = ResidualBlock(32)
+        self.conv3 = ConvLayer(32, 64, kernel_size=3, stride=2)
+        self.conv4 = ConvLayer(64, 64, kernel_size=3, stride=1)
+        self.dilate1 = DilateResBlock(64)
+        self.conv5 = ConvLayer(64, 64, kernel_size=3, stride=1)
+        self.dilate2 = DilateResBlock(64)
+        self.dilate3 = DilateResBlock(64)
+        self.conv6 = ConvLayer(64, 32, kernel_size=3, stride=1)
+        self.conv7 = ConvLayer(32, 3, kernel_size=3, stride=1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        conv1 = self.relu(self.conv1(x))
+        conv2 = self.relu(self.conv2(conv1))
+        resid1 = self.relu(self.resid1(conv2))
+        conv3 = self.relu(self.conv3(resid1))
+        conv4 = self.relu(self.conv4(conv3))
+        dilate1 = self.relu(self.dilate1(conv4))
+        conv5 = self.relu(self.conv5(dilate1))
+        dilate2 = self.relu(self.dilate2(conv5))
+        dilate3 = self.relu(self.dilate3(dilate2))
+        conv6 = self.relu(self.conv6(dilate3))
+        conv7 = self.relu(self.conv7(conv6))
+        return conv7

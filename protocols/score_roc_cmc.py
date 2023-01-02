@@ -9,7 +9,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.net_model import ResidualFeatureNet, STResNet_R, STResNet_S, \
-    STResNetRelu_R, STResNetRelu_S, STResNet16_R, STResNet16_S
+    STResNetRelu_R, STResNetRelu_S, STResNet16_R, STResNet16_S, STNResRFNet3v216
 from torch.autograd import Variable
 from protocols.plot.plotroc_basic import *
 from protocols.confusionmatrix.protocol_util import *
@@ -27,7 +27,8 @@ model_dict = {
     "STResNetRelu_R": STResNetRelu_R(),
     "STResNetRelu_S": STResNetRelu_S(),
     "STResNet16_R": STResNet16_R(),
-    "STResNet16_S": STResNet16_S()
+    "STResNet16_S": STResNet16_S(),
+    "STNResRFNet3v216": STNResRFNet3v216().cuda()
 }
 
 
@@ -259,7 +260,7 @@ if __name__ == '__main__':
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
     parser.add_argument("--hyper_parameter", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STResNet16_S_quadruplet_ssim_01-01-13-42-29/hyper_parameter.txt",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STResNet_R_quadruplet_ssim_01-02-09-59-40/hyper_parameter.txt",
                         dest="hyper_parameter")
     parser.add_argument("--check_point", type=str,
                         default="3000.pth",
@@ -279,10 +280,8 @@ if __name__ == '__main__':
             if key == "input_size":
                 v_tuple = (int(value[1:4]), int(value[6:9]))
                 para_dict[key] = v_tuple
-            else:para_dict[key] = value
-
-    para_dict['data_range'] = 255
-    para_dict['win_size'] = 13
+            else:
+                para_dict[key] = value
 
     cls_num = ['01', '02', '04', '07']
 

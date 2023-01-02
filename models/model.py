@@ -8,7 +8,7 @@ import time
 
 import models.loss_function
 from models.net_model import ResidualFeatureNet, STResNet_R, STResNet_S, \
-    STResNetRelu_R, STResNetRelu_S, STResNet16_R, STResNet16_S
+    STResNetRelu_R, STResNetRelu_S, STResNet16_R, STResNet16_S, STNResRFNet3v216, ResNet, DeformResNet, DilateResNet
 from models.loss_function import RSIL, ShiftedLoss, MSELoss, HammingDistance, MaskRSIL
 from models.pytorch_mssim import SSIM, SSIMGNN, RSSSIM, SpeedupRSSSIM
 from torchvision import transforms
@@ -36,7 +36,10 @@ model_dict = {
     "STResNetRelu_R": STResNetRelu_R().cuda(),
     "STResNetRelu_S": STResNetRelu_S().cuda(),
     "STResNet16_R": STResNet16_R().cuda(),
-    "STResNet16_S": STResNet16_S().cuda()
+    "STResNet16_S": STResNet16_S().cuda(),
+    "ResNet": ResNet().cuda(),
+    "DeformResNet": DeformResNet().cuda(),
+    "DilateResNet": DilateResNet().cuda()
 }
 
 
@@ -119,7 +122,10 @@ class Model(object):
                               "STResNetRelu_R",
                               "STResNetRelu_S",
                               "STResNet16_R",
-                              "STResNet16_S"]:
+                              "STResNet16_S",
+                              "ResNet",
+                              "DeformResNet",
+                              "DilateResNet"]:
             raise RuntimeError('Model not found')
         inference = model_dict[args.model].cuda()
         if args.model == "RFNet":

@@ -298,13 +298,13 @@ class ShiftedLoss(torch.nn.Module):
 
         # min_dist shape (bs, )  & sys.float_info.max is to get the max float value
         # min_dist save the maximal float value
-        min_dist = torch.ones(bs).cuda() * sys.float_info.max
+        min_dist = torch.ones(bs).to(fm1.device) * sys.float_info.max
         # torch is set tensor as an instance of Variable
         if isinstance(fm1, torch.autograd.Variable):
             min_dist = Variable(min_dist, requires_grad=False)
 
         if self.hshift == 0 and self.vshift == 0:
-            dist = mse_loss(fm1, fm2).cuda()
+            dist = mse_loss(fm1, fm2).to(fm1.device)
             min_dist, _ = torch.min(torch.stack([min_dist, dist]), 0)
             return min_dist
 
@@ -319,7 +319,7 @@ class ShiftedLoss(torch.nn.Module):
                     ref1, ref2 = ref1[:, :, :h - bv, :], ref2[:, :, bv:, :]
                 else:
                     ref1, ref2 = ref1[:, :, -bv:, :], ref2[:, :, :h + bv, :]
-                dist = mse_loss(ref1, ref2).cuda()
+                dist = mse_loss(ref1, ref2).to(fm1.device)
                 min_dist, _ = torch.min(torch.stack([min_dist.squeeze(), dist.squeeze()]), 0)
         return min_dist.squeeze()
 

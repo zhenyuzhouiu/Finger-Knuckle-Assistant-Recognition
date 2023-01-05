@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from torch.optim.lr_scheduler import MultiStepLR, ReduceLROnPlateau
 import torch
 from tqdm import tqdm
@@ -57,6 +58,9 @@ class Model(object):
         else:
             self.optimizer1 = torch.optim.Adam(self.inference.parameters(), args.learning_rate1)
 
+    def _init_fn(self, worker_id):
+        np.random.seed(int(self.args.seed_num))
+
     def _build_dataset_loader(self, args):
         transform = transforms.Compose([
             transforms.ToTensor()
@@ -66,7 +70,8 @@ class Model(object):
                                 if_aug=args.if_augment, if_hsv=args.if_hsv, if_rotation=args.if_rotation,
                                 if_translation=args.if_translation, if_scale=args.if_scale)
         logging("Successfully Load {} as training dataset...".format(args.train_path))
-        train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4)
+        train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True,
+                                  num_workers=4, pin_memory=True, worker_init_fn=self._init_fn)
 
         if args.n_tuple in ['triplet']:
             examples = iter(train_loader)

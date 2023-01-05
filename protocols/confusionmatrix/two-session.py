@@ -149,6 +149,18 @@ def genuine_imposter(args_session1_path, args_session2_path):
         # sys.stdout.write("[*] Processing genuine imposter for {} / {} \r".format(i, nsubs * nims))
         # sys.stdout.flush()
     print("\n [*] Done")
+
+    g_scores = np.array(g_scores)
+    i_scores = np.array(i_scores)
+    g_min = np.min(g_scores)
+    g_max = np.max(g_scores)
+    i_min = np.min(i_scores)
+    i_max = np.max(i_scores)
+    min = np.min(np.array([g_min, i_min]))
+    max = np.max(np.array([g_max, i_max]))
+    g_scores = (g_scores - min) / (max - min)
+    i_scores = (i_scores - min) / (max - min)
+
     return np.array(g_scores), np.array(i_scores), matching_matrix
 
 

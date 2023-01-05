@@ -23,9 +23,10 @@ from torch.utils.tensorboard import SummaryWriter
 def setup_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+    np.random.seed(seed)  # Numpy module.
+    random.seed(seed)  # Python random module.
+    torch.manual_seed(seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
@@ -35,8 +36,8 @@ def build_parser():
     # Checkpoint Options
     parser.add_argument('--checkpoint_dir', type=str,
                         dest='checkpoint_dir', default='./checkpoint/Joint-Finger-RFNet/')
-    parser.add_argument('--db_prefix', dest='db_prefix', default='MaskLM')
-    parser.add_argument('--checkpoint_interval', type=int, dest='checkpoint_interval', default=20)
+    parser.add_argument('--db_prefix', dest='db_prefix', default='MaskL')
+    parser.add_argument('--checkpoint_interval', type=int, dest='checkpoint_interval', default=500)
 
     # Dataset Options
     parser.add_argument('--train_path', type=str, dest='train_path',
@@ -47,7 +48,7 @@ def build_parser():
                         default='quadruplet', help="how to select the input tuple, triplet, quadruplet, oldtriplet")
     # Model
     parser.add_argument('--model', type=str, dest='model', default="STResNetRelu_R")
-    parser.add_argument('--loss_type', type=str, dest="loss_type", default="rsssim_speed")
+    parser.add_argument('--loss_type', type=str, dest="loss_type", default="ssim")
     parser.add_argument('--data_range', type=float, dest="data_range", default=1.0)
     parser.add_argument('--win_size', type=int, dest="win_size", default=13)
     parser.add_argument("--out_channel", type=int, dest="out_channel", default=3)
@@ -70,9 +71,9 @@ def build_parser():
     parser.add_argument('--alpha', type=float, dest='alpha', default=0.6)
     parser.add_argument('--alpha2', type=float, dest='alpha2', default=0.3, help="the second margin of quadruplet loss")
     parser.add_argument('--input_size', type=int, dest='input_size', default=(128, 128), help="(w, h)")
-    parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=2)
-    parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=2)
-    parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=2)
+    parser.add_argument('--horizontal_size', type=int, dest='horizontal_size', default=4)
+    parser.add_argument('--vertical_size', type=int, dest='vertical_size', default=4)
+    parser.add_argument('--rotate_angle', type=int, dest="rotate_angle", default=4)
     parser.add_argument('--step_size', type=int, dest="step_size", default=1)
     parser.add_argument('--freeze_stn', type=bool, dest="freeze_stn", default=True)
     parser.add_argument('--freeze_thre', type=float, dest="freeze_thre", default=0)
@@ -90,7 +91,6 @@ def build_parser():
 def main():
     parser = build_parser()
     args = parser.parse_args()
-
     setup_seed(args.seed_num)
 
     this_datetime = datetime.datetime.now().strftime('%m-%d-%H-%M-%S')

@@ -1,4 +1,7 @@
 import os
+
+# os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 from PIL import Image
 import numpy as np
 import scipy.io as io
@@ -143,7 +146,7 @@ def genuine_imposter_upright(test_path, image_size, options, inference, loss_mod
         y = feats_all[i:, :, :, :]
         bs, ch, he, wi = x.shape
         loss = np.ones(bs, ) * 1e5
-        chuncks = 50
+        chuncks = 100
         if bs > chuncks:
             num_chuncks = bs // chuncks
             num_reminder = bs % chuncks
@@ -205,6 +208,108 @@ def genuine_imposter_upright(test_path, image_size, options, inference, loss_mod
     return np.array(g_scores), np.array(i_scores), matt
 
 
+def two_session(session1, session2, image_size, options, inference, loss_model, gpu_num):
+    subs_session1 = subfolders(session1, preserve_prefix=True)
+    subs_session1 = sorted(subs_session1)
+    subs_session2 = subfolders(session2, preserve_prefix=True)
+    subs_session2 = sorted(subs_session2)
+    nsubs1 = len(subs_session1)
+    nsubs2 = len(subs_session2)
+    assert (nsubs1 == nsubs2 and nsubs1 != 0)
+
+    nsubs = nsubs1
+    nims = -1
+    feats_probe = []
+    feats_gallery = []
+
+    for gallery, probe in zip(subs_session1, subs_session2):
+        assert (os.path.basename(gallery) == os.path.basename(probe))
+        im_gallery = subimages(gallery, preserve_prefix=True)
+        im_gallery.sort()
+        im_probe = subimages(probe, preserve_prefix=True)
+        im_probe.sort()
+
+        nim_gallery = len(im_gallery)
+        nim_probe = len(im_probe)
+        if nims == -1:
+            nims = nim_gallery
+            assert (nims == nim_probe)  # Check if image numbers in probe equals number in gallery
+        else:
+            assert (nims == nim_gallery and nims == nim_probe)  # Check for each folder
+
+        probe_fv = calc_feats_more(*im_probe, size=image_size, options=options, model=inference, gpu_num=gpu_num)
+        gallery_fv = calc_feats_more(*im_gallery, size=image_size, options=options, model=inference, gpu_num=gpu_num)
+
+        feats_probe.append(probe_fv)
+        feats_gallery.append(gallery_fv)
+
+    feats_probe = torch.from_numpy(np.concatenate(feats_probe, 0)).cuda(gpu_num)
+    feats_gallery = np.concatenate(feats_gallery, 0)
+    feats_gallery2 = np.concatenate((feats_gallery, feats_gallery), 0)
+    feats_gallery = torch.from_numpy(feats_gallery2).cuda(gpu_num)
+
+    nl = nsubs * nims
+    matching_matrix = np.ones((nl, nl)) * 1000000
+    for i in range(nl):
+        x = feats_probe
+        y = feats_gallery[i: i + nl, :, :, :]
+        bs, ch, he, wi = x.shape
+        loss = np.ones(bs, ) * 1e5
+        chuncks = 100
+        if bs > chuncks:
+            num_chuncks = bs // chuncks
+            num_reminder = bs % chuncks
+            for nc in range(num_chuncks):
+                x_nc = x[0 + nc * chuncks:chuncks + nc * chuncks, :, :, :]
+                y_nc = y[0 + nc * chuncks:chuncks + nc * chuncks, :, :, :]
+                loss[0 + nc * chuncks:chuncks + nc * chuncks] = _loss(x_nc, y_nc, loss_model=loss_model)
+            if num_reminder > 0:
+                x_nc = x[chuncks + nc * chuncks:, :, :, :]
+                y_nc = y[chuncks + nc * chuncks:, :, :, :]
+                if x_nc.ndim == 3:
+                    x_nc = x_nc.unsqueeze(0)
+                    y_nc = y_nc.unsqueeze(0)
+                loss[chuncks + nc * chuncks:] = _loss(x_nc, y_nc, loss_model=loss_model)
+        else:
+            loss = _loss(feats_probe, feats_gallery[i: i + nl, :, :, :], loss_model=loss_model)
+        matching_matrix[:, i] = loss
+        print("[*] Pre-processing matching dict for {} / {} \r".format(i, nl))
+        # sys.stdout.write("[*] Pre-processing matching dict for {} / {} \r".format(i, nl))
+        # sys.stdout.flush()
+
+    for i in range(1, nl):
+        tmp = matching_matrix[i, -i:].copy()
+        matching_matrix[i, i:] = matching_matrix[i, :-i]
+        matching_matrix[i, :i] = tmp
+    print("\n [*] Done")
+
+    g_scores = []
+    i_scores = []
+    for i in range(nl):
+        start_idx = int(math.floor(i / nims))
+        g_scores.append(float(np.min(matching_matrix[i, start_idx * nims: start_idx * nims + nims])))
+        select = list(range(nl))
+        for j in range(nims):
+            select.remove(start_idx * nims + j)
+        i_scores += list(np.min(np.reshape(matching_matrix[i, select], (-1, nims)), axis=1))
+        print("[*] Processing genuine imposter for {} / {} \r".format(i, nsubs * nims))
+        # sys.stdout.write("[*] Processing genuine imposter for {} / {} \r".format(i, nsubs * nims))
+        # sys.stdout.flush()
+    print("\n [*] Done")
+    g_scores = np.array(g_scores)
+    i_scores = np.array(i_scores)
+    g_min = np.min(g_scores)
+    g_max = np.max(g_scores)
+    i_min = np.min(i_scores)
+    i_max = np.max(i_scores)
+    min = np.min(np.array([g_min, i_min]))
+    max = np.max(np.array([g_max, i_max]))
+    g_scores = (g_scores - min) / (max - min)
+    i_scores = (i_scores - min) / (max - min)
+
+    return np.array(g_scores), np.array(i_scores), matching_matrix
+
+
 def draw_roc(src_mat, color, label, dst):
     for i in range(len(src_mat)):
         data = io.loadmat(src_mat[i])
@@ -260,15 +365,17 @@ if __name__ == '__main__':
     parser.add_argument("--test_path", type=str,
                         default="/media/zhenyuzhou/Data/finger_knuckle_2018/FingerKnukcleDatabase/Finger-knuckle/mask-seg/",
                         dest="test_path")
+    parser.add_argument("--session2", type=str,
+                        default="/home/zhenyuzhou/Pictures/Finger-Knuckle-Database/PolyUKnuckleV3/GUI_Segment_Rotate/Session_2/",
+                        dest="session2")
     parser.add_argument("--hyper_parameter", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskLM_STResNetRelu_R_quadruplet_rsssim_speed_01-02-23-49-07/hyper_parameter.txt",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskL_STResNetRelu_R_quadruplet_ssim_01-05-10-53-06/hyper_parameter.txt",
                         dest="hyper_parameter")
-    parser.add_argument("--check_point", type=str,
-                        default="2800.pth",
-                        dest="check_point")
+    parser.add_argument("--check_point", type=str, default="3000.pth", dest="check_point")
+    parser.add_argument("--protocol", type=str, default="all_to_all", dest="protocol")
     parser.add_argument("--option", type=str, dest="option", default='RGB')
     parser.add_argument("--save_mmat", type=bool, dest="save_mmat", default=True)
-    parser.add_argument("--gpu_num", type=int, dest="gpu_num", default=1)
+    parser.add_argument("--gpu_num", type=int, dest="gpu_num", default=0)
     parser.add_argument("--if_draw", type=bool, dest="if_draw", default=True)
     args = parser.parse_args()
 
@@ -285,7 +392,8 @@ if __name__ == '__main__':
                 para_dict[key] = value
 
     # para_dict['data_range'] = "1.0"
-    cls_num = ['01']
+    cls_num = ['01', '02', '04', '07']
+    # cls_num = ['01']
 
     if not os.path.exists('.' + para_dict['checkpoint_dir'] + '/output'):
         os.mkdir('.' + para_dict['checkpoint_dir'] + '/output')
@@ -323,10 +431,18 @@ if __name__ == '__main__':
 
     for c in cls_num:
         test_path = os.path.join(args.test_path, c)
+        session2 = os.path.join(args.session2, c)
         out_path = os.path.join('.' + para_dict['checkpoint_dir'] + '/output', c + ".mat")
-        gscores, iscores, mmat = genuine_imposter_upright(test_path=test_path, image_size=para_dict['input_size'],
-                                                          options=args.option, inference=inference, loss_model=Loss,
-                                                          gpu_num=args.gpu_num)
+
+        if args.protocol == "all_to_all":
+            gscores, iscores, mmat = genuine_imposter_upright(test_path=test_path, image_size=para_dict['input_size'],
+                                                              options=args.option, inference=inference, loss_model=Loss,
+                                                              gpu_num=args.gpu_num)
+        else:
+            gscores, iscores, mmat = two_session(session1=test_path, session2=session2,
+                                                 image_size=para_dict['input_size'],
+                                                 options=args.option, inference=inference, loss_model=Loss,
+                                                 gpu_num=args.gpu_num)
 
         if args.save_mmat:
             io.savemat(out_path, {"g_scores": gscores, "i_scores": iscores, "mmat": mmat})

@@ -369,7 +369,7 @@ if __name__ == '__main__':
                         default="/home/zhenyuzhou/Pictures/Finger-Knuckle-Database/PolyUKnuckleV3/GUI_Segment_Rotate/Session_2/",
                         dest="session2")
     parser.add_argument("--hyper_parameter", type=str,
-                        default="../checkpoint/Joint-Finger-RFNet/MaskL_STResNetRelu_R_quadruplet_ssim_01-05-10-53-06/hyper_parameter.txt",
+                        default="../checkpoint/Joint-Finger-RFNet/MaskL_STResNetRelu_R_quadruplet_ssim_01-05-17-22-31/hyper_parameter.txt",
                         dest="hyper_parameter")
     parser.add_argument("--check_point", type=str, default="3000.pth", dest="check_point")
     parser.add_argument("--protocol", type=str, default="all_to_all", dest="protocol")
@@ -387,7 +387,7 @@ if __name__ == '__main__':
             value = p.split(":")[-1].strip('\n')
             if key == "input_size":
                 v_tuple = (int(value[1:4]), int(value[6:9]))
-                para_dict[key] = v_tuple
+                para_dict[key] = (128, 128)
             else:
                 para_dict[key] = value
 
